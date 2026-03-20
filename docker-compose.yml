@@ -13,12 +13,13 @@ services:
       - "${postgres_post}:5432"
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
-      - ./initdb:/docker-entrypoint-initdb.d
+      - ./init_db:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 10s
+      timeout: 5s
       retries: 5
-  
+
   minio:
     image: minio/minio
     container_name: mp_minio
@@ -32,7 +33,7 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
-  
+
 volumes:
   timescaledb_data:
   minio_data:
