@@ -27,7 +27,7 @@ select
     min(price) as low,
     last(price, event_ts) as close,
     sum(volume) as volume,
-    count(*) as stick_count
+    count(*) as tick_count
 from market_tick
 group by symbol, bucket
 with no data;
@@ -39,3 +39,24 @@ select add_continuous_aggregate_policy(
     schedule_interval => interval '1 minute',
     if_not_exists => true
 );
+
+create table if not exists news_sentiment (
+    id              serial,
+    symbol          text             not null,
+    headline        text,
+    source          text,
+    positive        double precision,
+    negative        double precision,
+    neutral         double precision,
+    sentiment_score double precision,  
+    scored_ts       timestamptz      not null default now()
+);
+
+select create_hypertable(
+    'news_sentiment', 'scored_ts',
+    chunk_time_interval => interval '7 days',
+    if_not_exists => true
+);
+
+create index if not exists idx_sentiment_symbol_ts
+    on news_sentiment (symbol, scored_ts desc);

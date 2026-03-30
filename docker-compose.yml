@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ${postgres_password}
       POSTGRES_DB: ${postgres_db}
     ports:
-      - "${postgres_post}:5432"
+      - "${postgres_port}:5432"
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
       - ./init_db:/docker-entrypoint-initdb.d
