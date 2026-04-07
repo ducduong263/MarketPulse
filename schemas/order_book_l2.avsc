@@ -1,0 +1,96 @@
+{
+  "type": "record",
+  "name": "OrderBookL2",
+  "namespace": "com.marketpulse.v1",
+  "doc": "L2 order book snapshot từ DNSE Quote channel — 3 bid + 3 ask levels",
+  "fields": [
+    {
+      "name": "symbol",
+      "type": "string",
+      "doc": "Mã chứng khoán, ví dụ: HPG, VIC"
+    },
+    {
+      "name": "market_id",
+      "type": "int",
+      "doc": "ID thị trường: 6=HOSE"
+    },
+    {
+      "name": "bid_price1",
+      "type": ["null", "double"],
+      "default": null,
+      "doc": "Best bid price (mức giá mua tốt nhất)"
+    },
+    {
+      "name": "bid_qty1",
+      "type": ["null", "int"],
+      "default": null,
+      "doc": "Tổng KL chờ mua tại bid_price1"
+    },
+    {
+      "name": "bid_price2",
+      "type": ["null", "double"],
+      "default": null
+    },
+    {
+      "name": "bid_qty2",
+      "type": ["null", "int"],
+      "default": null
+    },
+    {
+      "name": "bid_price3",
+      "type": ["null", "double"],
+      "default": null
+    },
+    {
+      "name": "bid_qty3",
+      "type": ["null", "int"],
+      "default": null
+    },
+    {
+      "name": "ask_price1",
+      "type": ["null", "double"],
+      "default": null,
+      "doc": "Best ask price (mức giá bán tốt nhất)"
+    },
+    {
+      "name": "ask_qty1",
+      "type": ["null", "int"],
+      "default": null,
+      "doc": "Tổng KL chờ bán tại ask_price1"
+    },
+    {
+      "name": "ask_price2",
+      "type": ["null", "double"],
+      "default": null
+    },
+    {
+      "name": "ask_qty2",
+      "type": ["null", "int"],
+      "default": null
+    },
+    {
+      "name": "ask_price3",
+      "type": ["null", "double"],
+      "default": null
+    },
+    {
+      "name": "ask_qty3",
+      "type": ["null", "int"],
+      "default": null
+    },
+    {
+      "name": "event_ts",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "Thời điểm sàn phát quote (sending_time), milliseconds since epoch"
+    },
+    {
+      "name": "received_ts",
+      "type": ["null", {"type": "long", "logicalType": "timestamp-millis"}],
+      "default": null,
+      "doc": "Thời điểm SDK nhận được (multicast_receive_time)"
+    }
+  ]
+}

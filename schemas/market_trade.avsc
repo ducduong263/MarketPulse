@@ -1,0 +1,77 @@
+{
+  "type": "record",
+  "name": "MarketTrade",
+  "namespace": "com.marketpulse.v1",
+  "doc": "TradeExtra tick từ DNSE Lightspeed — mỗi record là một lệnh khớp",
+  "fields": [
+    {
+      "name": "symbol",
+      "type": "string",
+      "doc": "Mã chứng khoán, ví dụ: MWG, FPT"
+    },
+    {
+      "name": "market_id",
+      "type": "int",
+      "doc": "ID thị trường: 6=HOSE"
+    },
+    {
+      "name": "price",
+      "type": "double",
+      "doc": "Giá khớp lệnh, đơn vị nghìn VND (match_price)"
+    },
+    {
+      "name": "quantity",
+      "type": "int",
+      "doc": "Khối lượng lệnh khớp này (match_qtty)"
+    },
+    {
+      "name": "side",
+      "type": "int",
+      "doc": "Chiều giao dịch: 1=buy, 2=sell"
+    },
+    {
+      "name": "session_vol",
+      "type": ["null", "long"],
+      "default": null,
+      "doc": "Tổng KLGD tích lũy từ đầu phiên (total_volume_traded)"
+    },
+    {
+      "name": "session_high",
+      "type": ["null", "double"],
+      "default": null,
+      "doc": "Giá cao nhất phiên tính đến tick này (highest_price)"
+    },
+    {
+      "name": "session_low",
+      "type": ["null", "double"],
+      "default": null,
+      "doc": "Giá thấp nhất phiên tính đến tick này (lowest_price)"
+    },
+    {
+      "name": "session_open",
+      "type": ["null", "double"],
+      "default": null,
+      "doc": "Giá mở cửa phiên (open_price)"
+    },
+    {
+      "name": "session_vwap",
+      "type": ["null", "double"],
+      "default": null,
+      "doc": "VWAP phiên từ sàn (avg_price)"
+    },
+    {
+      "name": "event_ts",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "Thời điểm sàn phát lệnh (sending_time), milliseconds since epoch"
+    },
+    {
+      "name": "received_ts",
+      "type": ["null", {"type": "long", "logicalType": "timestamp-millis"}],
+      "default": null,
+      "doc": "Thời điểm SDK nhận được (multicast_receive_time), dùng đo latency"
+    }
+  ]
+}

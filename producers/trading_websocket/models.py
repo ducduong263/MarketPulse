@@ -65,6 +65,8 @@ class Trade:
     lowestPrice: float
     openPrice: float
     tradingSessionId: int
+    sendingTime: Optional[float]
+    multicastReceiveTime: Optional[float]
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Trade":
@@ -81,6 +83,8 @@ class Trade:
             lowestPrice=data.get("LowestPrice", 0) or data.get("lowest_price", 0),
             openPrice=data.get("OpenPrice", 0) or data.get("open_price", 0),
             tradingSessionId=data.get("TradingSessionId", 0) or data.get("trading_session_id", 0),
+            sendingTime=parse_timestamp(data.get("SendingTime") or data.get("sending_time")),
+            multicastReceiveTime=parse_timestamp(data.get("MulticastReceiveTime") or data.get("multicast_receive_time")),
         )
 
 
@@ -100,6 +104,8 @@ class TradeExtra:
     lowestPrice: float
     openPrice: float
     tradingSessionId: int
+    sendingTime: Optional[float]
+    multicastReceiveTime: Optional[float]
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TradeExtra":
@@ -118,6 +124,8 @@ class TradeExtra:
             lowestPrice=data.get("LowestPrice", 0) or data.get("lowest_price", 0),
             openPrice=data.get("OpenPrice", 0) or data.get("open_price", 0),
             tradingSessionId=data.get("TradingSessionId", 0) or data.get("trading_session_id", 0),
+            sendingTime=parse_timestamp(data.get("SendingTime") or data.get("sending_time")),
+            multicastReceiveTime=parse_timestamp(data.get("MulticastReceiveTime") or data.get("multicast_receive_time")),
         )
 
 
