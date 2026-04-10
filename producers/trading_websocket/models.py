@@ -18,6 +18,13 @@ def parse_timestamp(v: Any) -> Optional[float]:
         return None
     if isinstance(v, (int, float)):
         return float(v)
+    if isinstance(v, str):
+        try:
+            # Handle ISO 8601 string timestamps natively
+            # e.g. '2026-04-10T07:45:23.113174877Z' -> float timestamp
+            return datetime.fromisoformat(v.replace('Z', '+00:00')).timestamp()
+        except ValueError:
+            pass
     if isinstance(v, dict):
         seconds = v.get("Seconds", v.get("seconds", 0))
         nanos = v.get("Nanos", v.get("nanos", 0))
@@ -109,23 +116,24 @@ class TradeExtra:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TradeExtra":
+        print(f'raw-data:{data}')
         return cls(
-            marketId=data.get("market_id", 0) or data.get("MarketId", 0),
-            boardId=data.get("board_id", 0) or data.get("BoardId", 0),
-            isin=data.get("isin", "") or data.get("Isin", ""),
-            symbol=data.get("Symbol") or data.get("symbol"),
-            price=data.get("MatchPrice", 0.0) or data.get("match_price", 0.0),
-            quantity=data.get("MatchQtty", 0) or data.get("match_qtty", 0),
-            side=data.get("Side", 0) or data.get("side", 0),
-            avgPrice=data.get("AvgPrice", 0) or data.get("avg_price", 0),
-            totalVolumeTraded=data.get("TotalVolumeTraded", 0) or data.get("total_volume_traded", 0),
-            grossTradeAmount=data.get("GrossTradeAmount", 0) or data.get("gross_trade_amount", 0),
-            highestPrice=data.get("HighestPrice", 0) or data.get("highest_price", 0),
-            lowestPrice=data.get("LowestPrice", 0) or data.get("lowest_price", 0),
-            openPrice=data.get("OpenPrice", 0) or data.get("open_price", 0),
-            tradingSessionId=data.get("TradingSessionId", 0) or data.get("trading_session_id", 0),
-            sendingTime=parse_timestamp(data.get("SendingTime") or data.get("sending_time")),
-            multicastReceiveTime=parse_timestamp(data.get("MulticastReceiveTime") or data.get("multicast_receive_time")),
+            marketId=data.get("marketId") or data.get("market_id") or data.get("MarketId", 0),
+            boardId=data.get("boardId") or data.get("board_id") or data.get("BoardId", 0),
+            isin=data.get("isin") or data.get("Isin", ""),
+            symbol=data.get("symbol") or data.get("Symbol"),
+            price=data.get("matchPrice") or data.get("MatchPrice") or data.get("match_price", 0.0),
+            quantity=data.get("matchQtty") or data.get("MatchQtty") or data.get("match_qtty", 0),
+            side=data.get("side") or data.get("Side", 0),
+            avgPrice=data.get("avgPrice") or data.get("AvgPrice") or data.get("avg_price", 0.0),
+            totalVolumeTraded=data.get("totalVolumeTraded") or data.get("TotalVolumeTraded") or data.get("total_volume_traded", 0),
+            grossTradeAmount=data.get("grossTradeAmount") or data.get("GrossTradeAmount") or data.get("gross_trade_amount", 0.0),
+            highestPrice=data.get("highestPrice") or data.get("HighestPrice") or data.get("highest_price", 0.0),
+            lowestPrice=data.get("lowestPrice") or data.get("LowestPrice") or data.get("lowest_price", 0.0),
+            openPrice=data.get("openPrice") or data.get("OpenPrice") or data.get("open_price", 0.0),
+            tradingSessionId=data.get("tradingSessionId") or data.get("TradingSessionId") or data.get("trading_session_id", 0),
+            sendingTime=parse_timestamp(data.get("sendingTime") or data.get("SendingTime") or data.get("sending_time")),
+            multicastReceiveTime=parse_timestamp(data.get("multicastReceiveTime") or data.get("MulticastReceiveTime") or data.get("multicast_receive_time")),
         )
 
 
@@ -298,6 +306,7 @@ class Quote:
         # Parse asks array
         offer_data = data.get("Offer") or data.get("offer") or []
         offers = [PriceLevel.from_dict(level) for level in offer_data]
+        print(f'raw-data:{data}')
 
         return cls(
             symbol=data.get("Symbol") or data.get("symbol"),
