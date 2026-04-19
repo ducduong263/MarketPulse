@@ -5,8 +5,8 @@ create extension if not exists timescaledb;
 -- ============================================================
 create table if not exists market_trade (
     symbol          text            not null,
-    market_id       smallint        not null, 
-
+    market_id       text            not null, 
+    board_id        text            not null,  
     price           double precision not null,   -- đơn vị nghìn VND
     quantity        integer          not null,   
     side            smallint         not null,   -- 1=buy 2=sell
@@ -36,7 +36,7 @@ create index if not exists idx_trade_symbol_side_ts
 -- ============================================================
 create table if not exists order_book_l2 (
     symbol          text            not null,
-    market_id       smallint        not null,
+    market_id       text            not null,
 
     bid_price1      double precision, bid_qty1  integer,
     bid_price2      double precision, bid_qty2  integer,

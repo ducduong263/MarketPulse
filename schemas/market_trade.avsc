@@ -11,8 +11,13 @@
     },
     {
       "name": "market_id",
-      "type": "int",
-      "doc": "ID thị trường: 6=HOSE"
+      "type": "string",
+      "doc": "ID thị trường: STO, HNX, UPQ,.."
+    },
+    {
+      "name": "board_id",
+      "type": "string",
+      "doc": "Mã bảng giao dịch: G1=liên tục, G2=định kỳ mở, G3=định kỳ đóng, G4=thỏa thuận, G7=sau giờ"
     },
     {
       "name": "price",

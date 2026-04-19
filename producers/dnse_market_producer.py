@@ -51,13 +51,25 @@ def _trade_to_dict(trade: TradeExtra, _ctx) -> dict:
     if event_ms is None:
         event_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
 
+    # Parse side to int (1=buy, 2=sell) accounting for 'BUY'/'SELL' strings
+    side_val = 0
+    if isinstance(trade.side, int):
+        side_val = trade.side
+    elif isinstance(trade.side, str):
+        _s = trade.side.strip().upper()
+        if _s in ("BUY", "B", "1"):
+            side_val = 1
+        elif _s in ("SELL", "S", "2"):
+            side_val = 2
+
     return {
         "symbol": trade.symbol,
-        "market_id": trade.marketId,
+        "market_id": trade.marketId if trade.marketId else "UNKNOWN",
+        "board_id": trade.boardId if trade.boardId else "UNKNOWN",
         "price": float(trade.price),
-        "quantity": trade.quantity,
-        "side": trade.side,
-        "session_vol": trade.totalVolumeTraded,
+        "quantity": int(trade.quantity) if trade.quantity is not None else 0,
+        "side": side_val,
+        "session_vol": int(trade.totalVolumeTraded) if trade.totalVolumeTraded is not None else None,
         "session_high": float(trade.highestPrice) if trade.highestPrice is not None else None,
         "session_low": float(trade.lowestPrice) if trade.lowestPrice is not None else None,
         "session_open": float(trade.openPrice) if trade.openPrice is not None else None,
@@ -140,7 +152,7 @@ async def main():
             print(f"[ERROR] Produce failed: {e}")
 
     # ── DNSE WebSocket ──
-    encoding = "msgpack"
+    encoding = "json"
     client = TradingClient(
         api_key=DNSE_API_KEY,
         api_secret=DNSE_API_SECRET,
