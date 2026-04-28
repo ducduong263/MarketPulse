@@ -22,7 +22,7 @@ load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────
 KAFKA_BOOTSTRAP = os.getenv("kafka_bootstrap_servers", "localhost:9092")
-SCHEMA_REGISTRY_URL = os.getenv("schena_registry_url", "http://localhost:8081")
+SCHEMA_REGISTRY_URL = os.getenv("schema_registry_url", "http://localhost:8081")
 KAFKA_TOPIC = "market.trade"
 
 DNSE_API_KEY = os.getenv("DNSE_API_KEY")

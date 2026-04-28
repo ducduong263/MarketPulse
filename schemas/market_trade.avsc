@@ -17,7 +17,7 @@
     {
       "name": "board_id",
       "type": "string",
-      "doc": "Mã bảng giao dịch: G1=liên tục, G2=định kỳ mở, G3=định kỳ đóng, G4=thỏa thuận, G7=sau giờ"
+      "doc": "Mã bảng giao dịch: G1, G3, G4, T1, T3,T4,T6"
     },
     {
       "name": "price",
