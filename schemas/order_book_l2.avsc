@@ -2,29 +2,34 @@
   "type": "record",
   "name": "OrderBookL2",
   "namespace": "com.marketpulse.v1",
-  "doc": "L2 order book snapshot từ DNSE Quote channel — 3 bid + 3 ask levels",
+  "doc": "L2 order book snapshot tu DNSE Quote channel — 3 bid + 3 ask levels",
   "fields": [
     {
       "name": "symbol",
       "type": "string",
-      "doc": "Mã chứng khoán, ví dụ: HPG, VIC"
+      "doc": "Ma chung khoan, vi du: HPG, VIC"
     },
     {
       "name": "market_id",
-      "type": "int",
-      "doc": "ID thị trường: 6=HOSE"
+      "type": "string",
+      "doc": "ID thi truong: STO, HNX, UPQ,.."
+    },
+    {
+      "name": "board_id",
+      "type": "string",
+      "doc": "Ma bang giao dich: G1, G3, G4, T1, T3, T4, T6"
     },
     {
       "name": "bid_price1",
       "type": ["null", "double"],
       "default": null,
-      "doc": "Best bid price (mức giá mua tốt nhất)"
+      "doc": "Best bid price (muc gia mua tot nhat)"
     },
     {
       "name": "bid_qty1",
       "type": ["null", "int"],
       "default": null,
-      "doc": "Tổng KL chờ mua tại bid_price1"
+      "doc": "Tong KL cho mua tai bid_price1"
     },
     {
       "name": "bid_price2",
@@ -50,13 +55,13 @@
       "name": "ask_price1",
       "type": ["null", "double"],
       "default": null,
-      "doc": "Best ask price (mức giá bán tốt nhất)"
+      "doc": "Best ask price (muc gia ban tot nhat)"
     },
     {
       "name": "ask_qty1",
       "type": ["null", "int"],
       "default": null,
-      "doc": "Tổng KL chờ bán tại ask_price1"
+      "doc": "Tong KL cho ban tai ask_price1"
     },
     {
       "name": "ask_price2",
@@ -79,18 +84,30 @@
       "default": null
     },
     {
+      "name": "total_bid_qty",
+      "type": ["null", "long"],
+      "default": null,
+      "doc": "Tong KL bid tat ca cac muc"
+    },
+    {
+      "name": "total_ask_qty",
+      "type": ["null", "long"],
+      "default": null,
+      "doc": "Tong KL ask tat ca cac muc"
+    },
+    {
       "name": "event_ts",
       "type": {
         "type": "long",
         "logicalType": "timestamp-millis"
       },
-      "doc": "Thời điểm sàn phát quote (sending_time), milliseconds since epoch"
+      "doc": "Thoi diem san phat quote (sendingTime), milliseconds since epoch"
     },
     {
       "name": "received_ts",
       "type": ["null", {"type": "long", "logicalType": "timestamp-millis"}],
       "default": null,
-      "doc": "Thời điểm SDK nhận được (multicast_receive_time)"
+      "doc": "Thoi diem SDK nhan duoc (multicastReceiveTime), do latency"
     }
   ]
-}
+}
