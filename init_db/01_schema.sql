@@ -83,3 +83,34 @@ select create_hypertable(
 
 create index if not exists idx_sentiment_symbol_ts
     on news_sentiment (symbol, published_ts desc);
+
+-- ============================================================
+-- Bảng security_definition (Giá trần sàn, tham chiếu)
+-- ============================================================
+create table if not exists security_definition (
+    symbol                      text            not null,
+    market_id                   text            not null,
+    board_id                    text            not null,
+    isin                        text,
+    product_grp_id              text,
+    security_group_id           text,
+    
+    basic_price                 double precision,
+    ceiling_price               double precision,
+    floor_price                 double precision,
+    
+    open_interest_qty           bigint,
+    
+    security_status             text,
+    admin_status                text,
+    trading_method_status       text,
+    trading_sanction_status     text,
+    
+    listing_date                date,
+    final_trade_date            date,
+    
+    trading_date                date            not null default current_date,
+    ingested_ts                 timestamptz     default now(),
+    
+    primary key (symbol, market_id, board_id, trading_date)
+);

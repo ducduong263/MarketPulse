@@ -29,7 +29,7 @@ DNSE_API_KEY = os.getenv("DNSE_API_KEY")
 DNSE_API_SECRET = os.getenv("DNSE_API_SECRET")
 DNSE_WS_URL = "wss://ws-openapi.dnse.com.vn"
 
-SYMBOLS = ["FPT", "VIC", "SSI", "HPG", "MWG"]
+SYMBOLS = ["ACB","FPT", "VIC", "SSI", "HPG", "MWG"]
 
 # -- Schema ----------------------------------------------------------------
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas" / "order_book_l2.avsc"

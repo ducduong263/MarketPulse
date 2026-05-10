@@ -1,7 +1,3 @@
--- ============================================================
--- OHLCV 1 min (Continuous Aggregate)
--- ============================================================
-
 create materialized view if not exists ohlcv_1min
 with (timescaledb.continuous) as
 select

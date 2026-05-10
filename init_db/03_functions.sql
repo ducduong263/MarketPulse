@@ -1,8 +1,3 @@
--- ============================================================
--- Function: ohlcv_live
--- Gộp nến đã đóng (cagg) + nến live (market_trade)
--- Hỗ trợ re-sample lên interval bất kỳ: 1m,3m,5m,15m,30m,1h
--- ============================================================
 create or replace function ohlcv_live(
     p_symbol    text,
     p_interval  text        default '1m',
