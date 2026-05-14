@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 
 # --- local imports ---
 from dnse import TradingClient
-from dnse.websocket.models import Quote, parse_timestamp_float
+from dnse.websocket.models import Quote
 
 load_dotenv()
 
@@ -56,7 +56,7 @@ def _safe_qty(levels, idx):
 
 def _quote_to_dict(quote: Quote, _ctx) -> dict:
     """Convert Quote -> dict theo Avro schema."""
-    exchange_ms = int(parse_timestamp_float(quote.time) * 1000)          if quote.time          else None
+    exchange_ms = int(quote.time * 1000)                 if quote.time                 else None
     dnse_ms     = int(quote.multicastReceiveTime * 1000) if quote.multicastReceiveTime else None
     producer_ms = int(quote.receivedAt * 1000)           if quote.receivedAt           else None
 

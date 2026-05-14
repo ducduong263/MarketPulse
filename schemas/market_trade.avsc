@@ -65,7 +65,7 @@
       "doc": "VWAP phiên từ sàn (avg_price)"
     },
     {
-      "name": "event_ts",
+      "name": "exchange_ts",
       "type": {
         "type": "long",
         "logicalType": "timestamp-millis"
@@ -73,10 +73,16 @@
       "doc": "Thời điểm sàn phát lệnh (sending_time), milliseconds since epoch"
     },
     {
-      "name": "received_ts",
+      "name": "dnse_ts",
       "type": ["null", {"type": "long", "logicalType": "timestamp-millis"}],
       "default": null,
       "doc": "Thời điểm SDK nhận được (multicast_receive_time), dùng đo latency"
+    },
+    {
+      "name": "producer_ts",
+      "type": ["null", {"type": "long", "logicalType": "timestamp-millis"}],
+      "default": null,
+      "doc": "_receivedAt: time.time() on producer machine when SDK decoded the WS message"
     }
   ]
 }

@@ -1,0 +1,40 @@
+{
+  "type": "record",
+  "name": "ForeignInvestor",
+  "namespace": "com.marketpulse.v1",
+  "doc": "Giao dich nha dau tu nuoc ngoai tu DNSE WebSocket",
+  "fields": [
+    { "name": "symbol",             "type": "string" },
+    { "name": "market_id",          "type": ["null", "string"], "default": null },
+    { "name": "board_id",           "type": ["null", "string"], "default": null },
+    { "name": "trading_session_id", "type": ["null", "string"], "default": null },
+
+    { "name": "sell_volume", "type": ["null", "long"], "default": null,
+      "doc": "KL ban trong lan cap nhat nay (delta)" },
+    { "name": "sell_value",  "type": ["null", "long"], "default": null,
+      "doc": "GT ban VND (delta)" },
+    { "name": "buy_volume",  "type": ["null", "long"], "default": null },
+    { "name": "buy_value",   "type": ["null", "long"], "default": null },
+
+    { "name": "total_sell_volume", "type": ["null", "long"], "default": null,
+      "doc": "Luy ke ca phien" },
+    { "name": "total_sell_value",  "type": ["null", "long"], "default": null },
+    { "name": "total_buy_volume",  "type": ["null", "long"], "default": null },
+    { "name": "total_buy_value",   "type": ["null", "long"], "default": null },
+
+    { "name": "order_limit_qty",  "type": ["null", "long"], "default": null,
+      "doc": "foreignerOrderLimitQuantity: room tong" },
+    { "name": "buy_possible_qty", "type": ["null", "long"], "default": null,
+      "doc": "foreignerBuyPossibleQuantity: room con lai" },
+
+    { "name": "exchange_ts",
+      "type": ["null", { "type": "long", "logicalType": "timestamp-millis" }],
+      "default": null,
+      "doc": "transactTime parsed to UTC epoch ms (nullable, format TBD)" },
+    {
+      "name": "producer_ts",
+      "type": { "type": "long", "logicalType": "timestamp-millis" },
+      "doc": "_receivedAt epoch ms"
+    }
+  ]
+}

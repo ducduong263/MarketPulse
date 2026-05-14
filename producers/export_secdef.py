@@ -8,13 +8,7 @@ import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "openapi-sdk", "python"))
-
-try:
-    from dnse import DNSEClient
-except ImportError:
-    print("[ERROR] Unable to import DNSEClient. Please check the SDK path again.")
-    sys.exit(1)
+from dnse import DNSEClient
 
 load_dotenv()
 

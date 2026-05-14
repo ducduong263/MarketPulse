@@ -1,0 +1,20 @@
+{
+  "type": "record",
+  "name": "ExpectedPrice",
+  "namespace": "com.marketpulse.v1",
+  "doc": "Gia du kien khop trong phien ATO/ATC tu DNSE WebSocket",
+  "fields": [
+    { "name": "symbol",         "type": "string" },
+    { "name": "market_id",      "type": ["null", "string"], "default": null },
+    { "name": "board_id",       "type": ["null", "string"], "default": null },
+    { "name": "isin",           "type": ["null", "string"], "default": null },
+    { "name": "close_price",    "type": ["null", "double"], "default": null },
+    { "name": "expected_price", "type": ["null", "double"], "default": null },
+    { "name": "expected_qty",   "type": ["null", "long"],   "default": null },
+    {
+      "name": "producer_ts",
+      "type": { "type": "long", "logicalType": "timestamp-millis" },
+      "doc": "_receivedAt epoch ms (UTC)"
+    }
+  ]
+}

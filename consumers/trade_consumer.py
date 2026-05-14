@@ -41,7 +41,7 @@ INSERT INTO market_trade (
     symbol, market_id, board_id,
     price, quantity, side,
     session_vol, session_high, session_low, session_open, session_vwap,
-    event_ts, received_ts
+    exchange_ts, dnse_ts, producer_ts
 ) VALUES %s
 """
 
@@ -85,8 +85,9 @@ def _record_to_row(record: dict) -> tuple:
         _unwrap_union(record.get("session_low")),
         _unwrap_union(record.get("session_open")),
         _unwrap_union(record.get("session_vwap")),
-        _ms_to_ts(record["event_ts"]),
-        _ms_to_ts(_unwrap_union(record.get("received_ts"))),
+        _ms_to_ts(record["exchange_ts"]),
+        _ms_to_ts(_unwrap_union(record.get("dnse_ts"))),
+        _ms_to_ts(_unwrap_union(record.get("producer_ts"))),
     )
 
 

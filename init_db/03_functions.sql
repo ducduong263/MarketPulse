@@ -55,17 +55,17 @@ begin
         union all
 
         select
-            time_bucket('1 minute', t.event_ts) as bucket,
-            first(t.price, t.event_ts)          as open,
+            time_bucket('1 minute', t.exchange_ts) as bucket,
+            first(t.price, t.exchange_ts)          as open,
             max(t.price)                        as high,
             min(t.price)                        as low,
-            last(t.price, t.event_ts)           as close,
+            last(t.price, t.exchange_ts)           as close,
             sum(t.quantity)::bigint              as volume
           from market_trade t
          where t.symbol   = p_symbol
-           and t.event_ts >= v_last_mat
-           and t.event_ts <= p_to
-         group by time_bucket('1 minute', t.event_ts)
+           and t.exchange_ts >= v_last_mat
+           and t.exchange_ts <= p_to
+         group by time_bucket('1 minute', t.exchange_ts)
     ),
     ----------------------------------------------------------------
     -- 2) Re-aggregate lên interval mong muốn

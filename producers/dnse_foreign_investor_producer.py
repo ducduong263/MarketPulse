@@ -11,7 +11,7 @@ from confluent_kafka.serialization import MessageField, SerializationContext, St
 from dotenv import load_dotenv
 
 from dnse import TradingClient
-from dnse.websocket.models import ForeignInvestor, parse_timestamp_float
+from dnse.websocket.models import ForeignInvestor
 
 load_dotenv()
 
@@ -51,17 +51,10 @@ def _to_int(v) -> int | None:
 
 
 def _fi_to_dict(fi: ForeignInvestor, _ctx) -> dict:
-    # Parse transactTime (string) -> epoch ms (nullable)
-    exchange_ms = None
-    if fi.transactTime:
-        ts_float = parse_timestamp_float(fi.transactTime)
-        if ts_float:
-            exchange_ms = int(ts_float * 1000)
+    exchange_ms = int(fi.transactTime * 1000) if fi.transactTime else None
 
-    # producer_ts: _receivedAt (always present, fallback to now)
     producer_ms = (
-        int(fi.receivedAt * 1000)
-        if fi.receivedAt
+        int(fi.receivedAt * 1000) if fi.receivedAt
         else int(datetime.now(timezone.utc).timestamp() * 1000)
     )
 

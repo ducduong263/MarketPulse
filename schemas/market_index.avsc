@@ -1,0 +1,47 @@
+{
+  "type": "record",
+  "name": "MarketIndex",
+  "namespace": "com.marketpulse.v1",
+  "doc": "Chi so thi truong tu DNSE - cap nhat moi 5 giay trong phien giao dich",
+  "fields": [
+    { "name": "index_name", "type": "string" },
+    { "name": "market_id", "type": ["null", "string"], "default": null },
+    { "name": "value", "type": ["null", "double"], "default": null },
+    { "name": "prior_value", "type": ["null", "double"], "default": null },
+    { "name": "highest_value", "type": ["null", "double"], "default": null },
+    { "name": "lowest_value", "type": ["null", "double"], "default": null },
+    { "name": "changed_value", "type": ["null", "double"], "default": null },
+    { "name": "changed_ratio", "type": ["null", "double"], "default": null },
+    { "name": "up_count", "type": ["null", "int"], "default": null },
+    { "name": "down_count", "type": ["null", "int"], "default": null },
+    { "name": "steady_count", "type": ["null", "int"], "default": null },
+    { "name": "upper_limit_count", "type": ["null", "int"], "default": null },
+    { "name": "lower_limit_count", "type": ["null", "int"], "default": null },
+    { "name": "up_volume", "type": ["null", "long"], "default": null },
+    { "name": "down_volume", "type": ["null", "long"], "default": null },
+    { "name": "steady_volume", "type": ["null", "long"], "default": null },
+    { "name": "total_volume", "type": ["null", "long"], "default": null },
+    { "name": "total_value", "type": ["null", "double"], "default": null },
+    { "name": "match_volume", "type": ["null", "long"], "default": null },
+    { "name": "match_value", "type": ["null", "double"], "default": null },
+    { "name": "deal_volume", "type": ["null", "long"], "default": null },
+    { "name": "deal_value", "type": ["null", "double"], "default": null },
+    { "name": "trading_session_id", "type": ["null", "string"], "default": null },
+    {
+      "name": "exchange_ts",
+      "type": { "type": "long", "logicalType": "timestamp-millis" },
+      "doc": "transactTime (VN time) converted to UTC epoch ms"
+    },
+    {
+      "name": "dnse_ts",
+      "type": ["null", { "type": "long", "logicalType": "timestamp-millis" }],
+      "default": null
+    },
+    {
+      "name": "producer_ts",
+      "type": ["null", { "type": "long", "logicalType": "timestamp-millis" }],
+      "default": null,
+      "doc": "_receivedAt: time.time() on producer machine when SDK decoded the WS message"
+    }
+  ]
+}

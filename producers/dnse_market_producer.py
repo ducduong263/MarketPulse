@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 
 # --- local imports ---
 from dnse import TradingClient
-from dnse.websocket.models import TradeExtra, parse_timestamp_float
+from dnse.websocket.models import TradeExtra
 
 load_dotenv()
 
@@ -44,7 +44,7 @@ def _load_avro_schema() -> str:
 def _trade_to_dict(trade: TradeExtra, _ctx) -> dict:
     """Convert TradeExtra -> dict theo Avro schema (dung lam to_dict cho AvroSerializer)."""
     # epoch float -> milliseconds int for Avro timestamp-millis
-    exchange_ms = int(parse_timestamp_float(trade.time) * 1000)          if trade.time          else None
+    exchange_ms = int(trade.time * 1000)                 if trade.time                 else None
     dnse_ms     = int(trade.multicastReceiveTime * 1000) if trade.multicastReceiveTime else None
     producer_ms = int(trade.receivedAt * 1000)           if trade.receivedAt           else None
 

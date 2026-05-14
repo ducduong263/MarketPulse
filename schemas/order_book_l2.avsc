@@ -96,7 +96,7 @@
       "doc": "Tong KL ask tat ca cac muc"
     },
     {
-      "name": "event_ts",
+      "name": "exchange_ts",
       "type": {
         "type": "long",
         "logicalType": "timestamp-millis"
@@ -104,10 +104,16 @@
       "doc": "Thoi diem san phat quote (sendingTime), milliseconds since epoch"
     },
     {
-      "name": "received_ts",
+      "name": "dnse_ts",
       "type": ["null", {"type": "long", "logicalType": "timestamp-millis"}],
       "default": null,
       "doc": "Thoi diem SDK nhan duoc (multicastReceiveTime), do latency"
+    },
+    {
+      "name": "producer_ts",
+      "type": ["null", {"type": "long", "logicalType": "timestamp-millis"}],
+      "default": null,
+      "doc": "_receivedAt: time.time() on producer machine when SDK decoded the WS message"
     }
   ]
 }
