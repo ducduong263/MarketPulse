@@ -15,8 +15,8 @@ from confluent_kafka.serialization import (
 from dotenv import load_dotenv
 
 # --- local imports ---
-from trading_websocket import TradingClient
-from trading_websocket.models import Quote
+from dnse import TradingClient
+from dnse.websocket.models import Quote, parse_timestamp_float
 
 load_dotenv()
 
@@ -56,12 +56,13 @@ def _safe_qty(levels, idx):
 
 def _quote_to_dict(quote: Quote, _ctx) -> dict:
     """Convert Quote -> dict theo Avro schema."""
-    event_ms = int(quote.sendingTime * 1000) if quote.sendingTime else None
-    received_ms = int(quote.multicastReceiveTime * 1000) if quote.multicastReceiveTime else None
+    exchange_ms = int(parse_timestamp_float(quote.time) * 1000)          if quote.time          else None
+    dnse_ms     = int(quote.multicastReceiveTime * 1000) if quote.multicastReceiveTime else None
+    producer_ms = int(quote.receivedAt * 1000)           if quote.receivedAt           else None
 
-    # Fallback neu sendingTime is None
-    if event_ms is None:
-        event_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    # Fallback: neu sendingTime la None, dung dnse_ms (cung NTP clock, dam bao exchange_ts <= dnse_ts)
+    if exchange_ms is None:
+        exchange_ms = dnse_ms or int(datetime.now(timezone.utc).timestamp() * 1000)
 
     return {
         "symbol": quote.symbol,
@@ -81,8 +82,9 @@ def _quote_to_dict(quote: Quote, _ctx) -> dict:
         "ask_qty3": _safe_qty(quote.offer, 2),
         "total_bid_qty": int(quote.totalBidQtty) if quote.totalBidQtty is not None else None,
         "total_ask_qty": int(quote.totalOfferQtty) if quote.totalOfferQtty is not None else None,
-        "event_ts": event_ms,
-        "received_ts": received_ms,
+        "exchange_ts": exchange_ms,
+        "dnse_ts":     dnse_ms,
+        "producer_ts": producer_ms,
     }
 
 

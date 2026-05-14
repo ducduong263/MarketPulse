@@ -15,8 +15,8 @@ from confluent_kafka.serialization import (
 from dotenv import load_dotenv
 
 # --- local imports ---
-from trading_websocket import TradingClient
-from trading_websocket.models import TradeExtra
+from dnse import TradingClient
+from dnse.websocket.models import TradeExtra, parse_timestamp_float
 
 load_dotenv()
 
@@ -42,14 +42,15 @@ def _load_avro_schema() -> str:
 
 
 def _trade_to_dict(trade: TradeExtra, _ctx) -> dict:
-    """Convert TradeExtra → dict theo Avro schema (dùng làm to_dict cho AvroSerializer)."""
-    # Convert epoch float → milliseconds int cho timestamp-millis
-    event_ms = int(trade.sendingTime * 1000) if trade.sendingTime else None
-    received_ms = int(trade.multicastReceiveTime * 1000) if trade.multicastReceiveTime else None
+    """Convert TradeExtra -> dict theo Avro schema (dung lam to_dict cho AvroSerializer)."""
+    # epoch float -> milliseconds int for Avro timestamp-millis
+    exchange_ms = int(parse_timestamp_float(trade.time) * 1000)          if trade.time          else None
+    dnse_ms     = int(trade.multicastReceiveTime * 1000) if trade.multicastReceiveTime else None
+    producer_ms = int(trade.receivedAt * 1000)           if trade.receivedAt           else None
 
-    # Fallback nếu sendingTime is None
-    if event_ms is None:
-        event_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    # Fallback: neu sendingTime la None, dung dnse_ms (cung NTP clock, dam bao exchange_ts <= dnse_ts)
+    if exchange_ms is None:
+        exchange_ms = dnse_ms or int(datetime.now(timezone.utc).timestamp() * 1000)
 
     # Parse side to int (1=buy, 2=sell) accounting for 'BUY'/'SELL' strings
     side_val = 0
@@ -74,8 +75,9 @@ def _trade_to_dict(trade: TradeExtra, _ctx) -> dict:
         "session_low": float(trade.lowestPrice) if trade.lowestPrice is not None else None,
         "session_open": float(trade.openPrice) if trade.openPrice is not None else None,
         "session_vwap": float(trade.avgPrice) if trade.avgPrice is not None else None,
-        "event_ts": event_ms,
-        "received_ts": received_ms,
+        "exchange_ts": exchange_ms,
+        "dnse_ts":     dnse_ms,
+        "producer_ts": producer_ms,
     }
 
 
