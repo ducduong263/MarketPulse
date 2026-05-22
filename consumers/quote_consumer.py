@@ -36,7 +36,6 @@ ALLOWED_BOARDS = {"G1"}
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas" / "order_book_l2.avsc"
 
 # ── SQL ───────────────────────────────────────────────────────────
-# Luu y: order_book_l2 table hien tai khong co board_id, total_bid_qty, total_ask_qty
 INSERT_SQL = """
 INSERT INTO order_book_l2 (
     symbol, market_id,
@@ -46,7 +45,7 @@ INSERT INTO order_book_l2 (
     ask_price1, ask_qty1,
     ask_price2, ask_qty2,
     ask_price3, ask_qty3,
-    exchange_ts, dnse_ts, producer_ts
+    exchange_ts
 ) VALUES %s
 """
 
@@ -73,7 +72,6 @@ def _ms_to_ts(value):
 
 
 def _record_to_row(record: dict) -> tuple:
-    """Chuyển Avro record dict → tuple để insert vào TimescaleDB."""
     return (
         record["symbol"],
         record["market_id"],
@@ -90,8 +88,6 @@ def _record_to_row(record: dict) -> tuple:
         _unwrap_union(record.get("ask_price3")),
         _unwrap_union(record.get("ask_qty3")),
         _ms_to_ts(record["exchange_ts"]),
-        _ms_to_ts(_unwrap_union(record.get("dnse_ts"))),
-        _ms_to_ts(_unwrap_union(record.get("producer_ts"))),
     )
 
 
@@ -125,7 +121,6 @@ def _create_db_conn():
 
 # ── Flush ─────────────────────────────────────────────────────────
 def _flush_batch(conn, consumer, batch: list, total_rows: int):
-    """Insert batch vào TimescaleDB và commit Kafka offset."""
     try:
         with conn.cursor() as cur:
             psycopg2.extras.execute_values(
@@ -134,7 +129,7 @@ def _flush_batch(conn, consumer, batch: list, total_rows: int):
                 page_size=len(batch),
             )
         conn.commit()
-        consumer.commit()  # chỉ commit Kafka sau khi DB commit thành công
+        consumer.commit()
         print(f"[FLUSH] +{len(batch)} rows (G1 only) | total: {total_rows + len(batch)}")
 
     except Exception as e:
@@ -186,7 +181,6 @@ def run():
                     else:
                         skipped += 1
 
-            # Flush batch khi đủ size hoặc timeout
             now = time.monotonic()
             should_flush = (
                 len(batch) >= BATCH_SIZE or
@@ -200,7 +194,7 @@ def run():
                 last_flush = now
 
     finally:
-        # Flush phần còn lại trước khi tắt
+    
         if batch:
             _flush_batch(conn, consumer, batch, total_rows)
             total_rows += len(batch)

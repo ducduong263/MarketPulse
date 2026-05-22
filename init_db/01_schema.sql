@@ -51,8 +51,6 @@ create table if not exists order_book_l2 (
         generated always as (ask_price1 - bid_price1) stored,
 
     exchange_ts     timestamptz     not null,
-    dnse_ts         timestamptz,
-    producer_ts     timestamptz,                -- _receivedAt: thời điểm Python SDK decode được message
     ingested_ts     timestamptz     default clock_timestamp()
 );
 
@@ -190,8 +188,7 @@ select create_hypertable('market_index', 'exchange_ts',
 create index if not exists idx_market_index_name_ts
     on market_index (index_name, exchange_ts desc);
 
-SELECT add_retention_policy('market_index',
-    drop_after => interval '30 days');
+
 
 -- ============================================================
 -- Bảng foreign_investor (Giao dịch nhà đầu tư nước ngoài)
@@ -228,3 +225,53 @@ select create_hypertable('foreign_investor', 'producer_ts',
 
 create index if not exists idx_fi_symbol_ts
     on foreign_investor (symbol, producer_ts desc);
+
+
+-- ============================================================
+-- Retention Policies
+-- ============================================================
+SELECT add_retention_policy('market_trade',     drop_after => interval '30 days', if_not_exists => true);
+SELECT add_retention_policy('order_book_l2',    drop_after => interval  '7 days', if_not_exists => true);
+SELECT add_retention_policy('expected_price',   drop_after => interval  '7 days', if_not_exists => true);
+SELECT add_retention_policy('market_index',     drop_after => interval '30 days', if_not_exists => true);
+SELECT add_retention_policy('foreign_investor', drop_after => interval '30 days', if_not_exists => true);
+
+
+-- ============================================================
+-- Compression Policies
+-- ============================================================
+
+ALTER TABLE order_book_l2 SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'symbol',
+    timescaledb.compress_orderby   = 'exchange_ts DESC'
+);
+SELECT add_compression_policy('order_book_l2',  compress_after => interval '2 days', if_not_exists => true);
+
+ALTER TABLE expected_price SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'symbol',
+    timescaledb.compress_orderby   = 'producer_ts DESC'
+);
+SELECT add_compression_policy('expected_price', compress_after => interval '2 days', if_not_exists => true);
+
+ALTER TABLE market_trade SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'symbol',
+    timescaledb.compress_orderby   = 'exchange_ts DESC'
+);
+SELECT add_compression_policy('market_trade',   compress_after => interval '7 days', if_not_exists => true);
+
+ALTER TABLE market_index SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'index_name',
+    timescaledb.compress_orderby   = 'exchange_ts DESC'
+);
+SELECT add_compression_policy('market_index',   compress_after => interval '7 days', if_not_exists => true);
+
+ALTER TABLE foreign_investor SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'symbol',
+    timescaledb.compress_orderby   = 'producer_ts DESC'
+);
+SELECT add_compression_policy('foreign_investor', compress_after => interval '7 days', if_not_exists => true);

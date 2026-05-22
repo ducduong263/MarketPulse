@@ -29,7 +29,7 @@ DNSE_API_KEY = os.getenv("DNSE_API_KEY")
 DNSE_API_SECRET = os.getenv("DNSE_API_SECRET")
 DNSE_WS_URL = "wss://ws-openapi.dnse.com.vn"
 
-SYMBOLS = ["ACB","FPT", "VIC", "SSI", "HPG", "MWG"]
+SYMBOLS = ["ACB","FPT", "VIC", "SSI", "HPG", "MWG","41I1G5000"]
 
 # -- Schema ----------------------------------------------------------------
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas" / "order_book_l2.avsc"
@@ -54,13 +54,25 @@ def _safe_qty(levels, idx):
     return None
 
 
+def _levels_to_list(levels) -> list:
+    """Serialize full PriceLevel list -> list of dicts for Avro array field."""
+    if not levels:
+        return []
+    return [
+        {
+            "price": float(lvl.price)    if lvl.price    is not None else None,
+            "qtty":  int(lvl.quantity)   if lvl.quantity is not None else None,
+        }
+        for lvl in levels
+    ]
+
+
 def _quote_to_dict(quote: Quote, _ctx) -> dict:
     """Convert Quote -> dict theo Avro schema."""
     exchange_ms = int(quote.time * 1000)                 if quote.time                 else None
     dnse_ms     = int(quote.multicastReceiveTime * 1000) if quote.multicastReceiveTime else None
     producer_ms = int(quote.receivedAt * 1000)           if quote.receivedAt           else None
 
-    # Fallback: neu sendingTime la None, dung dnse_ms (cung NTP clock, dam bao exchange_ts <= dnse_ts)
     if exchange_ms is None:
         exchange_ms = dnse_ms or int(datetime.now(timezone.utc).timestamp() * 1000)
 
@@ -80,8 +92,10 @@ def _quote_to_dict(quote: Quote, _ctx) -> dict:
         "ask_qty2": _safe_qty(quote.offer, 1),
         "ask_price3": _safe_price(quote.offer, 2),
         "ask_qty3": _safe_qty(quote.offer, 2),
-        "total_bid_qty": int(quote.totalBidQtty) if quote.totalBidQtty is not None else None,
+        "total_bid_qty": int(quote.totalBidQtty)   if quote.totalBidQtty   is not None else None,
         "total_ask_qty": int(quote.totalOfferQtty) if quote.totalOfferQtty is not None else None,
+        "bid_levels": _levels_to_list(quote.bid),
+        "ask_levels": _levels_to_list(quote.offer),
         "exchange_ts": exchange_ms,
         "dnse_ts":     dnse_ms,
         "producer_ts": producer_ms,

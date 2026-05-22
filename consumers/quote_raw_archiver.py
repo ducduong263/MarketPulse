@@ -1,27 +1,14 @@
-# consumers/quote_raw_archiver.py
-"""
-Market Quote Raw Archiver (Cold Path)
-─────────────────────────────────────
-Kafka topic `market.orderbook-l2` → Parquet → MinIO.
-
-Lưu trữ dữ liệu sổ lệnh thô vào MinIO dưới dạng Parquet,
-phân vùng theo ngày để phục vụ batch analytics và ML.
-
-Cấu trúc file trên MinIO:
-  raw/market_quote/date=2026-04-20/103000_103500.parquet
-"""
-
 import os
-import io
 import time
 import signal
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pyarrow as pa
-import pyarrow.parquet as pq
-from minio import Minio
-from confluent_kafka import DeserializingConsumer, KafkaError
+from deltalake import write_deltalake
+import boto3
+from botocore.exceptions import ClientError
+from confluent_kafka import DeserializingConsumer, KafkaError, Message
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
 from dotenv import load_dotenv
@@ -32,24 +19,50 @@ load_dotenv()
 KAFKA_BOOTSTRAP     = os.getenv("kafka_bootstrap_servers", "localhost:9092")
 SCHEMA_REGISTRY_URL = os.getenv("schema_registry_url", "http://localhost:8081")
 KAFKA_TOPIC         = "market.orderbook-l2"
-CONSUMER_GROUP      = "minio-quote-archiver-v1"
+CONSUMER_GROUP      = "delta-quote-archiver-test-v1"
 
-# MinIO
+# Delta Lake / MinIO
 MINIO_ENDPOINT  = os.getenv("minio_endpoint", "localhost:9000")
 MINIO_ACCESS    = os.getenv("minio_root_user", "minioadmin")
 MINIO_SECRET    = os.getenv("minio_root_password", "minioadmin")
-MINIO_BUCKET    = "market-data"
-MINIO_PREFIX    = "raw/market_quote"
+DELTA_TABLE_URI = "s3://market-data/bronze/market_quote"
 
-# Flush mỗi 5 phút hoặc 5000 records
-FLUSH_INTERVAL  = 300   # giây (5 phút)
-FLUSH_SIZE      = 5000  # records
-MAX_RETRY       = 3     # số lần retry khi upload MinIO thất bại
+STORAGE_OPTIONS = {
+    "AWS_ENDPOINT_URL":           f"http://{MINIO_ENDPOINT}",
+    "AWS_ACCESS_KEY_ID":          MINIO_ACCESS,
+    "AWS_SECRET_ACCESS_KEY":      MINIO_SECRET,
+    "AWS_REGION":                 "us-east-1",
+    "AWS_ALLOW_HTTP":             "true",
+    "AWS_FORCE_PATH_STYLE":      "true",
+    "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
+}
+
+FLUSH_INTERVAL = 300
+FLUSH_SIZE     = 5000
+MAX_RETRY      = 3
 
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas" / "order_book_l2.avsc"
 
-# ── Arrow Schema ─────────────────────────────────────────────────
-# Định nghĩa schema cố định cho Parquet file
+MINIO_BUCKET = "market-data"
+
+
+# ── Bucket setup ─────────────────────────────────────────────────
+def _ensure_bucket():
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=f"http://{MINIO_ENDPOINT}",
+        aws_access_key_id=MINIO_ACCESS,
+        aws_secret_access_key=MINIO_SECRET,
+        region_name="us-east-1",
+    )
+    try:
+        s3.head_bucket(Bucket=MINIO_BUCKET)
+    except ClientError:
+        s3.create_bucket(Bucket=MINIO_BUCKET)
+        print(f"[MINIO] Created bucket: {MINIO_BUCKET}")
+
+
+# ── Arrow Schema ──────────────────────────────────────────────────
 ARROW_SCHEMA = pa.schema([
     ("symbol",        pa.string()),
     ("market_id",     pa.string()),
@@ -68,32 +81,44 @@ ARROW_SCHEMA = pa.schema([
     ("ask_qty3",      pa.int32()),
     ("total_bid_qty", pa.int64()),
     ("total_ask_qty", pa.int64()),
-    ("event_ts",      pa.timestamp("ms", tz="UTC")),
-    ("received_ts",   pa.timestamp("ms", tz="UTC")),
+    
+    ("bid_levels",    pa.list_(pa.struct([
+        pa.field("price", pa.float64()),
+        pa.field("qtty",  pa.int32()),
+    ]))),
+    ("ask_levels",    pa.list_(pa.struct([
+        pa.field("price", pa.float64()),
+        pa.field("qtty",  pa.int32()),
+    ]))),
+    ("exchange_ts",   pa.timestamp("ms", tz="UTC")),  # exchange_ts = sending_time
+    ("dnse_ts",       pa.timestamp("ms", tz="UTC")),  # dnse_ts = multicast_receive_time
+    ("producer_ts",   pa.timestamp("ms", tz="UTC")),  # producer_ts = _receivedAt
+    
+    ("date",            pa.string()),   # partition key  "YYYY-MM-DD"
+    ("kafka_partition", pa.int32()),    # dedup key part 1
+    ("kafka_offset",    pa.int64()),    # dedup key part 2
 ])
 
 
 # ── Helpers ───────────────────────────────────────────────────────
 def _unwrap_union(value):
-    """Avro union {"type": value} → giá trị thực."""
     if value is None:
         return None
     if isinstance(value, dict):
         return next(iter(value.values()))
     return value
 
-
 def _to_ts(value):
-    """Chuyển Avro timestamp (datetime hoặc int ms) → datetime UTC."""
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
     return datetime.fromtimestamp(value / 1000, tz=timezone.utc)
 
 
-def _record_to_dict(record: dict) -> dict:
-    """Avro record → dict chuẩn cho PyArrow."""
+def _record_to_row(record: dict, msg: Message) -> dict:
+    exchange_ts = _to_ts(record["exchange_ts"])
+    date_str  = exchange_ts.strftime("%Y-%m-%d") if exchange_ts else datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return {
         "symbol":        record["symbol"],
         "market_id":     record["market_id"],
@@ -112,104 +137,82 @@ def _record_to_dict(record: dict) -> dict:
         "ask_qty3":      _unwrap_union(record.get("ask_qty3")),
         "total_bid_qty": _unwrap_union(record.get("total_bid_qty")),
         "total_ask_qty": _unwrap_union(record.get("total_ask_qty")),
-        "event_ts":      _to_ts(record["event_ts"]),
-        "received_ts":   _to_ts(_unwrap_union(record.get("received_ts"))),
+        
+        "bid_levels":    record.get("bid_levels") or [],
+        "ask_levels":    record.get("ask_levels") or [],
+        "exchange_ts":   exchange_ts,
+        "dnse_ts":       _to_ts(_unwrap_union(record.get("dnse_ts"))),
+        "producer_ts":   _to_ts(_unwrap_union(record.get("producer_ts"))),
+
+        "date":             date_str,
+        "kafka_partition":  msg.partition(),
+        "kafka_offset":     msg.offset(),
     }
 
 
 # ── Consumer setup ────────────────────────────────────────────────
-def _create_consumer():
+def _create_consumer() -> DeserializingConsumer:
     with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
         schema_str = f.read()
 
-    sr_client = SchemaRegistryClient({"url": SCHEMA_REGISTRY_URL})
+    sr_client         = SchemaRegistryClient({"url": SCHEMA_REGISTRY_URL})
     avro_deserializer = AvroDeserializer(sr_client, schema_str)
 
-    consumer = DeserializingConsumer({
+    return DeserializingConsumer({
         "bootstrap.servers":  KAFKA_BOOTSTRAP,
         "group.id":           CONSUMER_GROUP,
         "auto.offset.reset":  "earliest",
         "value.deserializer": avro_deserializer,
         "enable.auto.commit": False,
     })
-    return consumer
 
 
-def _create_minio():
-    client = Minio(
-        MINIO_ENDPOINT,
-        access_key=MINIO_ACCESS,
-        secret_key=MINIO_SECRET,
-        secure=False,  # localhost không dùng HTTPS
-    )
-    # Tạo bucket nếu chưa có
-    if not client.bucket_exists(MINIO_BUCKET):
-        client.make_bucket(MINIO_BUCKET)
-        print(f"[MINIO] Created bucket: {MINIO_BUCKET}")
-    return client
-
-
-# ── Flush to MinIO ────────────────────────────────────────────────
-def _flush_to_minio(minio_client, consumer, buffer: list, flush_start: str):
-    """Chuyển buffer → Parquet in-memory → upload MinIO."""
+# ── Flush to Delta Lake ───────────────────────────────────────────
+def _flush(consumer: DeserializingConsumer, buffer: list, last_msg: Message) -> int:
     if not buffer:
-        return
+        return 0
 
-    # Tạo PyArrow Table — from_pylist tự handle missing keys và cast type
     table = pa.Table.from_pylist(buffer, schema=ARROW_SCHEMA)
 
-    # Xác định đường dẫn file trên MinIO — lấy date từ event_ts của record đầu
-    first_event_ts = buffer[0]["event_ts"]
-    date_str = first_event_ts.strftime("%Y-%m-%d")
-    flush_end = datetime.now(timezone.utc).strftime("%H%M%S")
-    object_name = f"{MINIO_PREFIX}/date={date_str}/{flush_start}_{flush_end}.parquet"
-
-    # Ghi Parquet vào bộ nhớ
-    buf = io.BytesIO()
-    pq.write_table(table, buf, compression="snappy")
-    buf.seek(0)
-    file_size = buf.getbuffer().nbytes
-
-    # Upload lên MinIO
-    minio_client.put_object(
-        MINIO_BUCKET,
-        object_name,
-        buf,
-        length=file_size,
-        content_type="application/octet-stream",
+    write_deltalake(
+        DELTA_TABLE_URI,
+        table,
+        mode="append",
+        partition_by=["date"],
+        storage_options=STORAGE_OPTIONS,
+        schema_mode="merge",
     )
 
-    # Commit Kafka offset sau khi upload thành công
-    consumer.commit()
+    consumer.commit(message=last_msg)
 
-    size_kb = file_size / 1024
-    print(f"[FLUSH] {len(buffer)} records → {object_name} ({size_kb:.1f} KB)")
+    n = len(buffer)
+    print(f"[FLUSH] {n} records → {DELTA_TABLE_URI} (date={buffer[0]['date']}, offset={last_msg.offset()})")
+    return n
 
 
 # ── Main ──────────────────────────────────────────────────────────
 def run():
-    consumer     = _create_consumer()
-    minio_client = _create_minio()
+    _ensure_bucket()
+    consumer = _create_consumer()
     consumer.subscribe([KAFKA_TOPIC])
 
-    buffer       = []
-    flush_start  = datetime.now(timezone.utc).strftime("%H%M%S")
-    last_flush   = time.monotonic()
-    total_records = 0
+    buffer            = []
+    last_buffered_msg = None
+    last_flush        = time.monotonic()
+    total             = 0
+    running           = True
 
-    print(f"[START] Consumer group: {CONSUMER_GROUP}")
-    print(f"[CONFIG] Topic: {KAFKA_TOPIC} → MinIO s3://{MINIO_BUCKET}/{MINIO_PREFIX}/")
-    print(f"[CONFIG] Flush: mỗi {FLUSH_INTERVAL}s hoặc {FLUSH_SIZE} records | Format: Parquet + Snappy")
-
-    running = True
-
-    def _signal_handler(sig, frame):
+    def _stop(sig, frame):
         nonlocal running
-        print("\n[STOP] Shutting down archiver...")
+        print("\n[STOP] Shutting down...")
         running = False
 
-    signal.signal(signal.SIGINT,  _signal_handler)
-    signal.signal(signal.SIGTERM, _signal_handler)
+    signal.signal(signal.SIGINT,  _stop)
+    signal.signal(signal.SIGTERM, _stop)
+
+    print(f"[START] Consumer group: {CONSUMER_GROUP}")
+    print(f"[CONFIG] {KAFKA_TOPIC} → Delta Lake {DELTA_TABLE_URI}")
+    print(f"[CONFIG] Flush every {FLUSH_INTERVAL}s or {FLUSH_SIZE} records")
 
     try:
         while running:
@@ -218,51 +221,45 @@ def run():
             if msg is None:
                 pass
             elif msg.error():
-                if msg.error().code() == KafkaError._PARTITION_EOF:
-                    pass
-                else:
+                if msg.error().code() != KafkaError._PARTITION_EOF:
                     print(f"[ERROR] Kafka: {msg.error()}")
             else:
                 record = msg.value()
                 if record is not None:
-                    buffer.append(_record_to_dict(record))
+                    buffer.append(_record_to_row(record, msg))
+                    last_buffered_msg = msg  # always track last message in buffer
 
-            # Flush khi đủ size hoặc timeout
             now = time.monotonic()
             should_flush = (
                 len(buffer) >= FLUSH_SIZE or
                 (len(buffer) > 0 and now - last_flush >= FLUSH_INTERVAL)
             )
 
-            if should_flush:
+            if should_flush and last_buffered_msg is not None:
                 for attempt in range(MAX_RETRY):
                     try:
-                        _flush_to_minio(minio_client, consumer, buffer, flush_start)
-                        total_records += len(buffer)
+                        total += _flush(consumer, buffer, last_buffered_msg)
                         buffer.clear()
-                        flush_start = datetime.now(timezone.utc).strftime("%H%M%S")
+                        last_buffered_msg = None
                         last_flush = now
                         break
                     except Exception as e:
-                        print(f"[WARN] Upload attempt {attempt+1}/{MAX_RETRY} failed: {e}")
-                        time.sleep(2 ** attempt)  # exponential backoff: 1s, 2s, 4s
+                        print(f"[WARN] Flush attempt {attempt + 1}/{MAX_RETRY}: {e}")
+                        time.sleep(2 ** attempt)
                 else:
-                    # Fail sau MAX_RETRY lần → drop buffer, không commit offset
-                    print(f"[ERROR] Upload failed after {MAX_RETRY} attempts — clearing buffer, offset NOT committed")
+                    print(f"[ERROR] Flush failed after {MAX_RETRY} attempts — offset NOT committed")
                     buffer.clear()
-                    flush_start = datetime.now(timezone.utc).strftime("%H%M%S")
+                    last_buffered_msg = None
                     last_flush = now
 
     finally:
-        # Flush phần còn lại
-        if buffer:
+        if buffer and last_buffered_msg is not None:
             try:
-                _flush_to_minio(minio_client, consumer, buffer, flush_start)
-                total_records += len(buffer)
+                total += _flush(consumer, buffer, last_buffered_msg)
             except Exception as e:
                 print(f"[ERROR] Final flush failed: {e}")
         consumer.close()
-        print(f"[DONE] Total archived: {total_records} records")
+        print(f"[DONE] Total archived: {total} records")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
   "type": "record",
   "name": "OrderBookL2",
   "namespace": "com.marketpulse.v1",
-  "doc": "L2 order book snapshot tu DNSE Quote channel — 3 bid + 3 ask levels",
+  "doc": "L2 order book snapshot tu DNSE Quote channel — 3 bid + 3 ask levels (top) + full depth arrays",
   "fields": [
     {
       "name": "symbol",
@@ -87,13 +87,45 @@
       "name": "total_bid_qty",
       "type": ["null", "long"],
       "default": null,
-      "doc": "Tong KL bid tat ca cac muc"
+      "doc": "Tong KL bid tat ca cac muc (tu DNSE neu co, null neu khong)"
     },
     {
       "name": "total_ask_qty",
       "type": ["null", "long"],
       "default": null,
-      "doc": "Tong KL ask tat ca cac muc"
+      "doc": "Tong KL ask tat ca cac muc (tu DNSE neu co, null neu khong)"
+    },
+    {
+      "name": "bid_levels",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "BidLevel",
+          "fields": [
+            {"name": "price", "type": ["null", "double"], "default": null},
+            {"name": "qtty",  "type": ["null", "int"],    "default": null}
+          ]
+        }
+      },
+      "default": [],
+      "doc": "Full bid depth array (tat ca cac level DNSE gui, co the 3-10+ levels)"
+    },
+    {
+      "name": "ask_levels",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "AskLevel",
+          "fields": [
+            {"name": "price", "type": ["null", "double"], "default": null},
+            {"name": "qtty",  "type": ["null", "int"],    "default": null}
+          ]
+        }
+      },
+      "default": [],
+      "doc": "Full ask depth array (tat ca cac level DNSE gui, co the 3-10+ levels)"
     },
     {
       "name": "exchange_ts",
@@ -116,4 +148,4 @@
       "doc": "_receivedAt: time.time() on producer machine when SDK decoded the WS message"
     }
   ]
-}
+}
