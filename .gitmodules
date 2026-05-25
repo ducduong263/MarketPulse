@@ -1,4 +1,4 @@
-[submodule "producers/openapi-sdk"]
-	path = producers/openapi-sdk
+[submodule "sdk/openapi-sdk"]
+	path = sdk/openapi-sdk
 	url = https://github.com/ducduong263/openapi-sdk.git
 	ignore = untracked
