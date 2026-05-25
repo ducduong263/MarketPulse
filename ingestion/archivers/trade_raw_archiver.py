@@ -39,7 +39,7 @@ FLUSH_INTERVAL = 300    # seconds
 FLUSH_SIZE     = 5_000  # records
 MAX_RETRY      = 3
 
-SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas" / "market_trade.avsc"
+SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "schemas" / "market_trade.avsc"
 
 MINIO_BUCKET = "market-data"
 

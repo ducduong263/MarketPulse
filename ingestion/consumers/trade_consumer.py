@@ -33,7 +33,7 @@ BATCH_TIMEOUT = 2.0
 
 ALLOWED_BOARDS = {"G1"}
 
-SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas" / "market_trade.avsc"
+SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "schemas" / "market_trade.avsc"
 
 # ── SQL ───────────────────────────────────────────────────────────
 INSERT_SQL = """

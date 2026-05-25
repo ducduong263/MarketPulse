@@ -28,7 +28,7 @@ DB_PASSWORD = os.getenv("postgres_password", "mp_secret_2026")
 BATCH_SIZE    = 100
 BATCH_TIMEOUT = 3.0
 
-SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas" / "expected_price.avsc"
+SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "schemas" / "expected_price.avsc"
 
 # ── SQL ───────────────────────────────────────────────────────────
 INSERT_SQL = """

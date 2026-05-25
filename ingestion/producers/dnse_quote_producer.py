@@ -1,6 +1,7 @@
 import asyncio
 import os
 import signal
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -14,7 +15,11 @@ from confluent_kafka.serialization import (
 )
 from dotenv import load_dotenv
 
-# --- local imports ---
+# --- SDK path (submodule at sdk/openapi-sdk) ---
+_SDK = Path(__file__).resolve().parent.parent.parent / "sdk" / "openapi-sdk" / "python"
+sys.path.insert(0, str(_SDK))
+sys.path.insert(0, str(_SDK / "websocket-marketdata"))
+
 from dnse import TradingClient
 from dnse.websocket.models import Quote
 
@@ -32,7 +37,7 @@ DNSE_WS_URL = "wss://ws-openapi.dnse.com.vn"
 SYMBOLS = ["ACB","FPT", "VIC", "SSI", "HPG", "MWG","41I1G5000"]
 
 # -- Schema ----------------------------------------------------------------
-SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas" / "order_book_l2.avsc"
+SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "schemas" / "order_book_l2.avsc"
 
 
 def _load_avro_schema() -> str:

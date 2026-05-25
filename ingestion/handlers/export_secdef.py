@@ -3,10 +3,14 @@ import os
 import sys
 import time
 from datetime import datetime, date, timezone
+from pathlib import Path
 
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
+
+_SDK = Path(__file__).resolve().parent.parent.parent / "sdk" / "openapi-sdk" / "python"
+sys.path.insert(0, str(_SDK))
 
 from dnse import DNSEClient
 

@@ -41,7 +41,7 @@ FLUSH_INTERVAL = 300
 FLUSH_SIZE     = 5000
 MAX_RETRY      = 3
 
-SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas" / "order_book_l2.avsc"
+SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "schemas" / "order_book_l2.avsc"
 
 MINIO_BUCKET = "market-data"
 

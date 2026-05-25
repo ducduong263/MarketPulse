@@ -1,6 +1,7 @@
 import asyncio
 import os
 import signal
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -9,6 +10,10 @@ from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import MessageField, SerializationContext, StringSerializer
 from dotenv import load_dotenv
+
+_SDK = Path(__file__).resolve().parent.parent.parent / "sdk" / "openapi-sdk" / "python"
+sys.path.insert(0, str(_SDK))
+sys.path.insert(0, str(_SDK / "websocket-marketdata"))
 
 from dnse import TradingClient
 from dnse.websocket.models import ExpectedPrice
@@ -30,7 +35,7 @@ SYMBOLS = [
 ]
 BOARD_ID = "G1"
 
-SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas" / "expected_price.avsc"
+SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "schemas" / "expected_price.avsc"
 
 # ── Helpers ───────────────────────────────────────────────────────
 def _load_avro_schema() -> str:

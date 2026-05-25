@@ -23,7 +23,7 @@ KAFKA_BOOTSTRAP = os.getenv("kafka_bootstrap_servers", "localhost:9092")
 SCHEMA_REGISTRY_URL = os.getenv("schema_registry_url", "http://localhost:8081")
 KAFKA_TOPIC = "market.orderbook-l2"
 
-SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas" / "order_book_l2.avsc"
+SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "schemas" / "order_book_l2.avsc"
 
 
 def _load_avro_schema() -> str:
