@@ -11,9 +11,6 @@ import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent  # ingestion/handlers/ -> ingestion/ -> repo root
-sys.path.insert(0, str(_REPO_ROOT / "sdk" / "openapi-sdk" / "python"))
-sys.path.insert(0, str(_REPO_ROOT / "sdk" / "openapi-sdk" / "python" / "websocket-marketdata"))
 
 from dnse import TradingClient
 from dnse.websocket.models import SecurityDefinition

@@ -5,7 +5,21 @@ venv/
 # IDE
 .vscode/
 .idea/
+.agents/
+
 
 # Logs
 *.log
 logs/
+
+*.parquet
+__pycache__
+docs
+task.txt
+skills-lock.json
+temp
+*.pyc
+grafana
+
+airflow/config/airflow.cfg
+airflow/logs/

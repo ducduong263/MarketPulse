@@ -1,8 +1,15 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   timescaledb:
-    image: timescale/timescaledb:latest-pg17
+    image: timescale/timescaledb:2.27.1-pg17
     container_name: timescaledb
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_USER: ${postgres_user}
       POSTGRES_PASSWORD: ${postgres_password}
@@ -19,16 +26,17 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: minio
     restart: unless-stopped
+    logging: *default-logging
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${minio_root_user}
       MINIO_ROOT_PASSWORD: ${minio_root_password}
     ports:
-      - "${minio_port}:9000"
-      - "9001:9001"
+      - "127.0.0.1:9005:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio_data:/data
 
@@ -36,6 +44,7 @@ services:
     image: confluentinc/cp-zookeeper:7.9.6
     container_name: zookeeper
     restart: unless-stopped
+    logging: *default-logging
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -49,6 +58,7 @@ services:
     image: confluentinc/cp-kafka:7.9.6
     container_name: kafka
     restart: unless-stopped
+    logging: *default-logging
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -58,6 +68,11 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      # ── Log Retention (giới hạn dung lượng Kafka data) ─────────────────
+      KAFKA_LOG_RETENTION_HOURS: 25 # Giữ message tối đa 25 giờ (1 phiên giao dịch + buffer)
+      KAFKA_LOG_RETENTION_BYTES: 524288000 # Tối đa 500 MB / partition
+      KAFKA_LOG_SEGMENT_BYTES: 104857600 # Mỗi segment tối đa 100 MB
+      KAFKA_LOG_CLEANUP_POLICY: delete
     depends_on:
       zookeeper:
         condition: service_healthy
@@ -73,6 +88,7 @@ services:
     image: confluentinc/cp-schema-registry:7.9.6
     container_name: schema-registry
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       kafka:
         condition: service_healthy
@@ -83,9 +99,10 @@ services:
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
 
   grafana:
-    image: grafana/grafana-oss:latest
+    image: grafana/grafana-oss:11.6.5
     container_name: grafana
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "3000:3000"
     environment:
@@ -105,3 +122,8 @@ volumes:
   timescaledb_data:
   minio_data:
   grafana_data:
+
+networks:
+  marketpulse_net:
+    name: marketpulse_net
+    driver: bridge

@@ -11,10 +11,6 @@ from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import MessageField, SerializationContext, StringSerializer
 from dotenv import load_dotenv
 
-_SDK = Path(__file__).resolve().parent.parent.parent / "sdk" / "openapi-sdk" / "python"
-sys.path.insert(0, str(_SDK))
-sys.path.insert(0, str(_SDK / "websocket-marketdata"))
-
 from dnse import TradingClient
 from dnse.websocket.models import ExpectedPrice
 
