@@ -1,0 +1,80 @@
+"""
+dag_eod_archive — End-of-day archive to Delta Lake Bronze.
+
+Schedule: 15:15 ICT daily (Mon–Fri) = 08:15 UTC
+
+Archives tables without real-time archivers:
+  - foreign_investor  → Kafka topic market.foreign-investor (from 09:00 ICT)
+  - market_index      → Kafka topic market.index (from 09:00 ICT)
+
+market_trade and market_quote are archived in real-time by Docker services.
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone, timedelta
+
+from airflow.sdk import dag, task
+
+logger = logging.getLogger(__name__)
+
+
+@dag(
+    dag_id="dag_eod_archive",
+    schedule="30 15 * * 1-5",
+    start_date=None,
+    catchup=False,
+    tags=["marketpulse", "archive", "delta-lake"],
+    doc_md=__doc__,
+)
+def dag_eod_archive():
+
+    @task()
+    def check_trading_day() -> bool:
+        from utils.db import is_trading_day
+        today = (datetime.now(timezone.utc) + timedelta(hours=7)).date()
+        result = is_trading_day(today)
+        logger.info("[CHECK] %s is_trading_day=%s", today, result)
+        if not result:
+            raise Exception(f"Skipping: {today} is not a trading day")
+        return result
+
+    @task()
+    def archive_foreign_investor(is_trading: bool) -> int:
+        from utils.eod_archive_helpers import archive_topic_to_delta
+        return archive_topic_to_delta(
+            topic       = "market.foreign-investor",
+            schema_file = "foreign_investor.avsc",
+            delta_uri   = "s3://market-data/bronze/foreign_investor",
+            ts_cols     = ["exchange_ts", "producer_ts", "ingested_ts"],
+            group_id    = "eod-archive-foreign-investor",
+        )
+
+    @task()
+    def archive_market_index(is_trading: bool) -> int:
+        from utils.eod_archive_helpers import archive_topic_to_delta
+        return archive_topic_to_delta(
+            topic       = "market.index",
+            schema_file = "market_index.avsc",
+            delta_uri   = "s3://market-data/bronze/market_index",
+            ts_cols     = ["exchange_ts", "dnse_ts", "producer_ts", "ingested_ts"],
+            group_id    = "eod-archive-market-index",
+        )
+
+    @task()
+    def log_summary(n_fi: int, n_index: int) -> None:
+        today_str = (datetime.now(timezone.utc) + timedelta(hours=7)).date().isoformat()
+        logger.info(
+            "[EOD ARCHIVE DONE] %s: foreign_investor=%d rows, market_index=%d rows",
+            today_str, n_fi, n_index,
+        )
+
+    # ── DAG wiring ────────────────────────────────────────────────
+    is_trading = check_trading_day()
+    n_fi    = archive_foreign_investor(is_trading)
+    n_index = archive_market_index(is_trading)
+    log_summary(n_fi, n_index)
+
+
+dag_eod_archive()

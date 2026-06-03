@@ -1,0 +1,23 @@
+# ── Database ──────────────────────────────────────────────────────────────────
+psycopg2-binary==2.9.11     # TimescaleDB queries from DAG utils
+
+# ── Delta Lake / Object Storage ───────────────────────────────────────────────
+deltalake==1.6.0            # Delta Lake optimize (dag_compact_bronze) + write
+pyarrow==23.0.1             # Arrow format (required by deltalake + pandas)
+boto3==1.43.9               # MinIO/S3 access
+
+# ── Kafka ─────────────────────────────────────────────────────────────────────
+confluent-kafka==2.13.2     # Read from Kafka topics (dag_eod_archive)
+fastavro==1.12.1            # Avro deserialization
+
+# ── Data processing ───────────────────────────────────────────────────────────
+pandas==3.0.1               # DataFrame (eod_archive_helpers, delta_writer)
+numpy==2.4.3                # pandas dependency
+
+# ── HTTP / Auth ───────────────────────────────────────────────────────────────
+requests==2.32.5            # REST API calls (dnse_helpers)
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv==1.2.2
+python-dateutil==2.9.0.post0
+tzdata==2025.3

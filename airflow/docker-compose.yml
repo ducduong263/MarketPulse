@@ -1,0 +1,206 @@
+#   docker compose -f docker-compose.yml -f airflow/docker-compose.yml up -d
+#   docker compose -f docker-compose.yml -f airflow/docker-compose.yml down
+#
+# Debug:
+#   docker compose -f docker-compose.yml -f airflow/docker-compose.yml --profile debug run --rm airflow-cli
+# ─────────────────────────────────────────────────────────────────────────────
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:3.2.1-python3.12
+  env_file:
+    - ./.env
+  environment:
+    # ── Executor ─────────────────────────────────────────────────────────────
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+
+    # ── Security ─────────────────────────────────────────────────────────────
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:-changeme_jwt_secret}
+
+    # ── API Server ────────────────────────────────────────────────
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+
+    # ── DAG behavior ─────────────────────────────────────────────────────────
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+
+    # ── Timezone & Language ───────────────────────────────────────
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: Asia/Ho_Chi_Minh
+    AIRFLOW__WEBSERVER__DEFAULT_UI_LANGUAGE: en
+
+    # ── MarketPulse services──────
+    MINIO_ENDPOINT: minio:9000
+    KAFKA_BOOTSTRAP: kafka:29092
+    SCHEMA_REGISTRY_URL: http://schema-registry:8081
+
+    # ── Custom packages (via mounted requirements.txt) ─────
+    _PIP_ADDITIONAL_REQUIREMENTS: "-r /opt/airflow/requirements.txt"
+
+    AIRFLOW_CONFIG: /opt/airflow/config/airflow.cfg
+
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/logs:/opt/airflow/logs
+    - ./airflow/plugins:/opt/airflow/plugins
+    - ./airflow/config:/opt/airflow/config
+    - ./airflow/requirements.txt:/opt/airflow/requirements.txt:ro
+    # MarketPulse scripts & schemas accessible inside Airflow containers
+    - ./ingestion:/opt/airflow/ingestion
+    - ./schemas:/opt/airflow/schemas
+    - ./sdk:/opt/airflow/sdk
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on: &airflow-common-depends-on
+    airflow-postgres:
+      condition: service_healthy
+
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  airflow-postgres:
+    image: postgres:17-alpine
+    container_name: airflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "airflow" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    expose:
+      - "5432"
+
+  airflow-apiserver:
+    <<: *airflow-common
+    container_name: airflow-apiserver
+    command: api-server
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    command: scheduler
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://localhost:8974/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    container_name: airflow-dag-processor
+    command: dag-processor
+    healthcheck:
+      test: [ "CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"' ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-triggerer:
+    <<: *airflow-common
+    container_name: airflow-triggerer
+    command: triggerer
+    healthcheck:
+      test: [ "CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"' ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        # ── Resource Check (based on official Airflow template) ──
+        one_meg=1048576
+        mem_available=$$(($$(getconf _PHYS_PAGES) * $$(getconf PAGE_SIZE) / one_meg))
+        cpus_available=$$(grep -cE 'cpu[0-9]+' /proc/stat)
+        disk_available=$$(df / | tail -1 | awk '{print $$4}')
+        if (( mem_available < 4000 )); then
+          echo "WARNING: Airflow requires at least 4GB of RAM. Available: $$(numfmt --to iec $$((mem_available * one_meg)))"
+        fi
+        if (( cpus_available < 2 )); then
+          echo "WARNING: Airflow requires at least 2 CPUs. Available: $${cpus_available}"
+        fi
+        if (( disk_available < one_meg * 10 )); then
+          echo "WARNING: Airflow requires at least 10GB of disk space. Available: $$(numfmt --to iec $$((disk_available * 1024)))"
+        fi
+        # ── Initialize Directories and Permissions ───────────────────
+        mkdir -p /opt/airflow/{logs,dags,plugins,config}
+        chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/
+        /entrypoint airflow version
+        /entrypoint airflow config list > /dev/null
+        chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/{logs,dags,plugins,config}
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+      _PIP_ADDITIONAL_REQUIREMENTS: ''
+    user: "0:0"
+
+  # ── CLI (debug only) ───────────
+  airflow-cli:
+    <<: *airflow-common
+    container_name: airflow-cli
+    profiles:
+      - debug
+    environment:
+      <<: *airflow-common-env
+      CONNECTION_CHECK_MAX_COUNT: "0"
+    command:
+      - bash
+      - -c
+      - airflow
+    depends_on:
+      <<: *airflow-common-depends-on
+
+volumes:
+  airflow_postgres_data:
+
+networks:
+  default:
+    name: marketpulse_default
+    external: true

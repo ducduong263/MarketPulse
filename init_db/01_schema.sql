@@ -115,6 +115,8 @@ create table if not exists security_definition (
     primary key (symbol, market_id, board_id, trading_date)
 );
 
+
+
 -- ============================================================
 -- Bảng expected_price (Giá dự kiến khớp ATO/ATC)
 -- Dữ liệu Periodic, chỉ xuất hiện trong phiên ATO/ATC
@@ -226,6 +228,34 @@ select create_hypertable('foreign_investor', 'producer_ts',
 create index if not exists idx_fi_symbol_ts
     on foreign_investor (symbol, producer_ts desc);
 
+
+-- ============================================================
+-- Bảng trading_calendar (Lịch ngày giao dịch — lấy từ DNSE REST API)
+-- Ngày nằm trong bảng = ngày giao dịch. Sync bởi dag_sync_calendar.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS trading_calendar (
+    trading_date  date  PRIMARY KEY
+);
+
+-- ============================================================
+-- Bảng instrument_master (Danh mục mã chứng khoán)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS instrument_master (
+    symbol              text        NOT NULL,
+    market_id           text        NOT NULL,
+    security_group_id   text,
+    symbol_type         text,
+    listed_date         date,
+    short_name          text,
+    full_name           text,
+    index_name          text,
+
+    -- Metadata
+    is_active           boolean     NOT NULL DEFAULT true,
+    last_synced_ts      timestamptz DEFAULT clock_timestamp(),
+
+    PRIMARY KEY (symbol, market_id)
+);
 
 -- ============================================================
 -- Retention Policies
