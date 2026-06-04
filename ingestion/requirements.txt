@@ -1,0 +1,33 @@
+# ─── Ingestion layer requirements ───────────────────────────────────────────
+# Used by: producers, consumers, archivers running as Docker services
+# Base image: python:3.12-slim
+#
+# NOTE: dnse_sdk is mounted as a volume (/app/sdk) and added to PYTHONPATH,
+#       so it does NOT appear here.
+
+# ── Kafka ─────────────────────────────────────────────────────────────────────
+confluent-kafka==2.13.2     # Kafka producer/consumer + Avro serializer
+fastavro==1.12.1            # Fast Avro encode/decode (used by confluent-kafka)
+
+# ── Database ──────────────────────────────────────────────────────────────────
+psycopg2-binary==2.9.11     # TimescaleDB (PostgreSQL) driver
+
+# ── Delta Lake / Object Storage ───────────────────────────────────────────────
+deltalake==1.6.0            # Delta Lake read/write (Rust-backed)
+pyarrow==23.0.1             # Arrow columnar format (required by deltalake)
+boto3==1.43.9               # MinIO / S3 bucket management (_ensure_bucket)
+
+# ── WebSocket / HTTP ──────────────────────────────────────────────────────────
+websockets==16.0            # DNSE WebSocket client
+requests==2.32.5            # HTTP REST calls
+pydantic==2.12.1            # Data validation in SDK models
+
+# ── Data processing ───────────────────────────────────────────────────────────
+pandas==3.0.1               # DataFrame (used in archivers for batch writes)
+numpy==2.4.3                # Numeric ops (pandas dependency)
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv==1.2.2
+python-dateutil==2.9.0.post0
+ntplib==0.4.0
+tzdata==2025.3

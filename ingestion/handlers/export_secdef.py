@@ -25,7 +25,9 @@ DNSE_API_KEY = os.getenv("DNSE_API_KEY")
 DNSE_API_SECRET = os.getenv("DNSE_API_SECRET")
 DNSE_BASE_URL = "https://openapi.dnse.com.vn"
 
-SYMBOLS = ["ACB", "FPT", "VIC", "SSI", "HPG", "MWG"]
+_eq   = os.getenv("WATCH_SYMBOLS",     "ACB,FPT,VIC,SSI,HPG,MWG").split(",")
+_deriv = os.getenv("WATCH_DERIVATIVES", "41I1G6000").split(",")
+SYMBOLS = [s.strip() for s in _eq + _deriv if s.strip()]
 
 INSERT_SQL = """
 INSERT INTO security_definition (
@@ -73,6 +75,7 @@ def _parse_date(date_str) -> date | None:
         return None
 
 def _fetch_with_retry(client, symbol: str):
+    status, body = 500, None
     for attempt in range(1, MAX_RETRY + 1):
         status, body = client.get_security_definition(symbol=symbol, board_id=None, dry_run=False)
         if status == 200:

@@ -65,6 +65,12 @@
       "doc": "VWAP phiên từ sàn (avg_price)"
     },
     {
+      "name": "trading_session_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Mã phiên giao dịch: '10'=ATO, '30'=ATC, '40'=Liên tục, '80'=Halt, '99'=Đóng bảng"
+    },
+    {
       "name": "exchange_ts",
       "type": {
         "type": "long",

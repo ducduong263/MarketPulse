@@ -11,6 +11,16 @@ import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
 
+# ── SDK path setup ────────────────────────────────────────────────
+# Works in both local dev and Docker/Airflow (mounted at /opt/airflow/sdk)
+_SDK_CANDIDATES = [
+    Path(__file__).resolve().parents[3] / "sdk" / "openapi-sdk" / "python",
+    Path("/opt/airflow/sdk/openapi-sdk/python"),
+]
+for _sdk_path in _SDK_CANDIDATES:
+    if _sdk_path.exists() and str(_sdk_path) not in sys.path:
+        sys.path.insert(0, str(_sdk_path))
+        break
 
 from dnse import TradingClient
 from dnse.websocket.models import SecurityDefinition
@@ -18,8 +28,11 @@ from dnse.websocket.models import SecurityDefinition
 load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────
-DNSE_API_KEY    = os.getenv("DNSE_API_KEY")
-DNSE_API_SECRET = os.getenv("DNSE_API_SECRET")
+DNSE_API_KEY    = os.environ.get("DNSE_API_KEY")
+DNSE_API_SECRET = os.environ.get("DNSE_API_SECRET")
+
+if not DNSE_API_KEY or not DNSE_API_SECRET:
+    raise ValueError("DNSE_API_KEY and DNSE_API_SECRET must be set in environment")
 DNSE_WS_URL     = "wss://ws-openapi.dnse.com.vn"
 
 DB_HOST     = os.getenv("postgres_host", "localhost")
@@ -172,16 +185,14 @@ async def main(timeout: int | None):
     await client.connect()
     print("[SUCCESS] Connected to DNSE WebSocket!")
 
-    # Subscribe all boards, all symbols (symbols=[] = all)
     await client.subscribe_sec_def(
-        symbols=[],
+        symbols=["*"],
         on_sec_def=handle_secdef,
         encoding="msgpack",
-        board_id=None,
+        board_id="G1",
     )
     print("[SUBSCRIBED] Listening for SecurityDefinition on all boards...")
 
-    # Deadline cho --timeout
     deadline = (time.monotonic() + timeout) if timeout else None
 
     try:
