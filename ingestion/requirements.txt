@@ -2,12 +2,11 @@
 # Used by: producers, consumers, archivers running as Docker services
 # Base image: python:3.12-slim
 #
-# NOTE: dnse_sdk is mounted as a volume (/app/sdk) and added to PYTHONPATH,
-#       so it does NOT appear here.
+# ── DNSE SDK dependencies ─────────────────────────────────────────────────────
+msgpack>=1.0                # Used by dnse/websocket/encoding.py (msgpack encoding)
 
 # ── Kafka ─────────────────────────────────────────────────────────────────────
-confluent-kafka==2.13.2     # Kafka producer/consumer + Avro serializer
-fastavro==1.12.1            # Fast Avro encode/decode (used by confluent-kafka)
+confluent-kafka[avro,schemaregistry]==2.13.2  # Pulls fastavro, httpx, authlib automatically
 
 # ── Database ──────────────────────────────────────────────────────────────────
 psycopg2-binary==2.9.11     # TimescaleDB (PostgreSQL) driver

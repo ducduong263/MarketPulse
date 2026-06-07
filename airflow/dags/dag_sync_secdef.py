@@ -1,7 +1,7 @@
 """
 dag_secdef_sync — Daily sync of security definitions (ceiling/floor/reference prices).
 
-Schedule: 07:45 ICT daily (Mon-Fri)
+Schedule: 07:55 ICT daily (Mon-Fri)
 
 Tasks:
   1. check_trading_day      — skip if today is not in trading_calendar
@@ -19,7 +19,7 @@ from pathlib import Path
 from airflow.sdk import dag, task
 
 SYNC_SECDEF_SCRIPT = str(Path("/opt/airflow/ingestion/handlers/sync_secdef.py"))
-SECDEF_TIMEOUT     = 1800
+SECDEF_TIMEOUT     = 900
 
 
 def _today_ict():
@@ -28,7 +28,7 @@ def _today_ict():
 
 @dag(
     dag_id="dag_secdef_sync",
-    schedule="45 7 * * 1-5",
+    schedule="55 7 * * 1-5",
     start_date=None,
     catchup=False,
     tags=["marketpulse", "reference", "secdef"],
@@ -38,10 +38,40 @@ def dag_secdef_sync():
 
     @task()
     def check_trading_day() -> bool:
+        import logging
         from utils.db import is_trading_day
+
+        log = logging.getLogger(__name__)
         today = _today_ict()
+
+        # ── Check 1: trading calendar ─────────────────────────────
         if not is_trading_day(today):
             raise Exception(f"Skipping: {today} is not a trading day")
+
+        # ── Check 2: time-window guard ────────────────────────────
+        MAX_LAG_MINUTES = 15    # 07:55 + 15 min = cutoff at 08:10 ICT
+        SCHEDULED_HOUR  = 7
+        SCHEDULED_MIN   = 55
+
+        now_ict = datetime.now(timezone.utc) + timedelta(hours=7)
+        cutoff  = now_ict.replace(
+            hour=SCHEDULED_HOUR, minute=SCHEDULED_MIN, second=0, microsecond=0
+        ) + timedelta(minutes=MAX_LAG_MINUTES)
+
+        if now_ict > cutoff:
+            log.warning(
+                "[SKIP] dag_secdef_sync triggered at %s ICT, but cutoff is %s ICT. "
+                "Run is too late — secdef data would be unreliable. "
+                "Manually trigger this DAG before %s to sync properly.",
+                now_ict.strftime("%H:%M"),
+                cutoff.strftime("%H:%M"),
+                cutoff.strftime("%H:%M"),
+            )
+            raise Exception(
+                f"Skipping: run time {now_ict.strftime('%H:%M')} ICT is past the "
+                f"secdef window (cutoff {cutoff.strftime('%H:%M')} ICT)"
+            )
+
         return True
 
     @task()

@@ -37,6 +37,11 @@ def detect_instrument_changes(today: date) -> dict:
     """
     from utils.db import get_secdef_symbols, get_active_instrument_symbols, get_all_instrument_symbols
 
+    # Minimum number of symbols expected in a valid secdef snapshot.
+    # HOSE alone lists ~400 stocks; a full snapshot (HOSE+HNX+UPCOM+derivatives) has ~3000.
+    # If we get less than this, the sync ran outside market hours or failed silently.
+    MIN_SECDEF_COUNT = 200
+
     today_secdef    = get_secdef_symbols(today)
     all_instruments = get_all_instrument_symbols()    # all rows, regardless of is_active
     active_instruments = get_active_instrument_symbols()  # only is_active=True
@@ -50,16 +55,32 @@ def detect_instrument_changes(today: date) -> dict:
             "to_deactivate":  [],
         }
 
+    logger.info(
+        "[DELTA] secdef today: %d | IM(active): %d | IM(all): %d",
+        len(today_secdef), len(active_instruments), len(all_instruments),
+    )
+
+    # Safety guard: refuse to deactivate when secdef snapshot is incomplete
+    if len(today_secdef) < MIN_SECDEF_COUNT:
+        logger.warning(
+            "[DELTA] SAFETY GUARD: today_secdef has only %d symbols (< %d minimum). "
+            "secdef sync likely ran outside market hours or returned incomplete data. "
+            "Skipping deactivation to prevent false mass-deactivation.",
+            len(today_secdef), MIN_SECDEF_COUNT,
+        )
+        return {
+            "today":         today.isoformat(),
+            "first_run":     False,
+            "new_symbols":   [],   # also skip new symbol fetch — data unreliable
+            "to_deactivate": [],
+        }
+
     # Symbols in secdef but completely absent from instrument_master (never seen before)
     new_symbols = sorted(today_secdef - all_instruments)
 
     # Active instruments that no longer appear in today's secdef
     to_deactivate = sorted(active_instruments - today_secdef)
 
-    logger.info(
-        "[DELTA] secdef today: %d | IM(active): %d | IM(all): %d",
-        len(today_secdef), len(active_instruments), len(all_instruments),
-    )
     logger.info(
         "[DELTA] New (not in IM at all): %d | To deactivate (active but missing from secdef): %d",
         len(new_symbols), len(to_deactivate),

@@ -7,8 +7,7 @@ pyarrow==23.0.1             # Arrow format (required by deltalake + pandas)
 boto3==1.43.9               # MinIO/S3 access
 
 # ── Kafka ─────────────────────────────────────────────────────────────────────
-confluent-kafka==2.13.2     # Read from Kafka topics (dag_eod_archive)
-fastavro==1.12.1            # Avro deserialization
+confluent-kafka[avro,schemaregistry]==2.13.2  # Pulls fastavro, httpx, authlib automatically
 
 # ── Data processing ───────────────────────────────────────────────────────────
 pandas==3.0.1               # DataFrame (eod_archive_helpers, delta_writer)

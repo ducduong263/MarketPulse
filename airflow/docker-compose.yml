@@ -8,7 +8,7 @@
 x-airflow-common: &airflow-common
   image: apache/airflow:3.2.1-python3.12
   env_file:
-    - ./.env
+    - .env
   environment:
     # ── Executor ─────────────────────────────────────────────────────────────
     &airflow-common-env
@@ -202,5 +202,5 @@ volumes:
 
 networks:
   default:
-    name: marketpulse_default
+    name: mp-core_default
     external: true

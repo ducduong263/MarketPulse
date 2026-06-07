@@ -1,0 +1,133 @@
+# ── Ingestion Services ─────────────────────────────────────────────────────────
+# Run alongside the main stack:
+#   docker compose -f docker-compose.yml -f ingestion/docker-compose.yml up -d
+#
+# Each producer/consumer is an isolated service with its own restart policy.
+# A crash in one container does NOT affect others.
+#
+# Container naming: p-<type> = producer, c-<type> = consumer
+#   p-trade, p-quote, p-index, p-ep, p-fi
+#   c-trade, c-quote, c-index, c-ep, c-fi
+# ──────────────────────────────────────────────────────────────────────────────
+
+x-ingestion-common: &ingestion-common
+  image: marketpulse-ingestion:latest
+  build:
+    context: ..              # Points to project root
+    dockerfile: ingestion/Dockerfile
+  env_file:
+    - ../.env
+  restart: unless-stopped
+
+# ── Shared environment for all services ───────────────────────────────────────
+# These OVERRIDE the .env defaults for Docker networking
+# (localhost → actual service hostnames on the shared Docker network)
+x-ingestion-env: &ingestion-env
+  kafka_bootstrap_servers: kafka:29092
+  schema_registry_url:     http://schema-registry:8081
+  postgres_host:           timescaledb
+  postgres_port:           "5432"
+  minio_endpoint:          minio:9000
+  # Symbol resolver defaults (override per-service as needed)
+  SYMBOL_FILTER_MODE:      db
+  SYMBOL_FILTER_STATUS:    NO_HALT
+  SYMBOL_FILTER_SANCTION:  NRM
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PRODUCERS  (WebSocket DNSE → Kafka)
+# ═════════════════════════════════════════════════════════════════════════════
+
+services:
+
+  p-trade:
+    <<: *ingestion-common
+    container_name: p-trade
+    command: python ingestion/producers/dnse_trade_producer.py
+    environment:
+      <<: *ingestion-env
+      SYMBOL_FILTER_INDEXES: VN30,VN100
+      SYMBOL_FILTER_GROUPS:  FU       # Futures/derivatives
+
+  p-quote:
+    <<: *ingestion-common
+    container_name: p-quote
+    command: python ingestion/producers/dnse_quote_producer.py
+    environment:
+      <<: *ingestion-env
+      SYMBOL_FILTER_INDEXES: VN30,VN100
+      SYMBOL_FILTER_GROUPS:  FU
+
+  p-index:
+    <<: *ingestion-common
+    container_name: p-index
+    command: python ingestion/producers/dnse_market_index_producer.py
+    environment:
+      <<: *ingestion-env
+      SYMBOL_FILTER_MODE: static
+      WATCH_SYMBOLS:      VNINDEX,VN30,HNX30,UPCOM
+
+  p-ep:
+    <<: *ingestion-common
+    container_name: p-ep
+    command: python ingestion/producers/dnse_expected_price_producer.py
+    environment:
+      <<: *ingestion-env
+      SYMBOL_FILTER_INDEXES: VN30
+      SYMBOL_FILTER_GROUPS:  ""
+
+  p-fi:
+    <<: *ingestion-common
+    container_name: p-fi
+    command: python ingestion/producers/dnse_foreign_investor_producer.py
+    environment:
+      <<: *ingestion-env
+      SYMBOL_FILTER_INDEXES: VN30,VN100
+      SYMBOL_FILTER_GROUPS:  ""
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CONSUMERS  (Kafka → TimescaleDB)
+# ═════════════════════════════════════════════════════════════════════════════
+
+  c-trade:
+    <<: *ingestion-common
+    container_name: c-trade
+    command: python ingestion/consumers/trade_consumer.py
+    environment:
+      <<: *ingestion-env
+
+  c-quote:
+    <<: *ingestion-common
+    container_name: c-quote
+    command: python ingestion/consumers/quote_consumer.py
+    environment:
+      <<: *ingestion-env
+
+  c-index:
+    <<: *ingestion-common
+    container_name: c-index
+    command: python ingestion/consumers/market_index_consumer.py
+    environment:
+      <<: *ingestion-env
+
+  c-ep:
+    <<: *ingestion-common
+    container_name: c-ep
+    command: python ingestion/consumers/expected_price_consumer.py
+    environment:
+      <<: *ingestion-env
+
+  c-fi:
+    <<: *ingestion-common
+    container_name: c-fi
+    command: python ingestion/consumers/foreign_investor_consumer.py
+    environment:
+      <<: *ingestion-env
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Network — reuse the shared network from root docker-compose.yml
+# ═════════════════════════════════════════════════════════════════════════════
+
+networks:
+  default:
+    name: mp-core_default
+    external: true
