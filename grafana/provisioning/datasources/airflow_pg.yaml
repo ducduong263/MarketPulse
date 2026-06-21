@@ -1,0 +1,19 @@
+apiVersion: 1
+
+datasources:
+  # ── Airflow internal PostgreSQL (DAG run status, task duration) ───────────
+  - name: AirflowDB
+    uid: airflow-pg
+    type: postgres
+    url: airflow-postgres:5432
+    user: airflow
+    secureJsonData:
+      password: airflow
+    jsonData:
+      database: airflow
+      sslmode: disable
+      maxOpenConns: 5
+      maxIdleConns: 5
+      postgresVersion: 1700
+    isDefault: false
+    editable: true

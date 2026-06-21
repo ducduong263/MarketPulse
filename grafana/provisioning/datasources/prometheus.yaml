@@ -1,0 +1,13 @@
+apiVersion: 1
+
+datasources:
+  # ── Prometheus (cAdvisor + kafka-exporter metrics) ─────────────────────────
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    url: http://prometheus:9090
+    access: proxy
+    isDefault: false
+    editable: true
+    jsonData:
+      timeInterval: "15s"

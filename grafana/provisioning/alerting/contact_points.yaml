@@ -1,0 +1,12 @@
+apiVersion: 1
+
+# ── Telegram Contact Point ────────────────────────────────────────────────────
+# Grafana provisioning không hỗ trợ tốt chatid dạng số qua env var.
+# Cấu hình Telegram trực tiếp trong Grafana UI:
+#   1. Mở localhost:3000 > Alerting > Contact Points > + Add contact point
+#   2. Chọn type: Telegram
+#   3. Điền BOT Token và Chat ID
+#   4. Bấm Test để kiểm tra, sau đó Save
+# ─────────────────────────────────────────────────────────────────────────────
+
+contactPoints: []

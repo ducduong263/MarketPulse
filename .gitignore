@@ -6,6 +6,9 @@ venv/
 .vscode/
 .idea/
 .agents/
+.gemini/
+
+Scratch
 
 
 # Logs
@@ -19,7 +22,6 @@ task.txt
 skills-lock.json
 temp
 *.pyc
-grafana
 
 airflow/config/airflow.cfg
 airflow/logs/

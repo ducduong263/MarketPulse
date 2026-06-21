@@ -1,0 +1,1143 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    { "title": "Overview", "type": "dashboard", "url": "/d/mp-overview", "icon": "external link", "tooltip": "System status overview", "targetBlank": false },
+    { "title": "Layer 1 — Ingestion", "type": "dashboard", "url": "/d/mp-ingestion", "icon": "external link", "tooltip": "WebSocket status, reconnects, throughput", "targetBlank": false },
+    { "title": "Layer 2 — Kafka", "type": "dashboard", "url": "/d/mp-kafka", "icon": "external link", "tooltip": "Consumer lag, messages/sec, offsets", "targetBlank": false },
+    { "title": "Layer 4 — Airflow", "type": "dashboard", "url": "/d/mp-airflow", "icon": "external link", "tooltip": "DAG runs, task status", "targetBlank": false },
+    { "title": "Layer 5 — Data Quality", "type": "dashboard", "url": "/d/mp-data-quality", "icon": "external link", "tooltip": "Gap detector, price anomaly, stale data", "targetBlank": false }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "marketpulse"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "value": [
+            "$__all"
+          ],
+          "text": "All"
+        },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Thị trường (Market)",
+        "multi": true,
+        "name": "market_id",
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          },
+          {
+            "selected": false,
+            "text": "HOSE (STO)",
+            "value": "STO"
+          },
+          {
+            "selected": false,
+            "text": "HNX (STX)",
+            "value": "STX"
+          },
+          {
+            "selected": false,
+            "text": "Phái sinh (DVX)",
+            "value": "DVX"
+          }
+        ],
+        "query": "HOSE (STO) : STO, HNX (STX) : STX, Phái sinh (DVX) : DVX",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "Asia/Ho_Chi_Minh",
+  "title": "Layer 3 — Storage & Latency",
+  "uid": "mp-storage",
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "⏱ Data Freshness — Giây từ lần insert cuối",
+      "description": "Màu xanh < 10s, Vàng 10-60s, Đỏ > 60s. Nếu đỏ trong giờ giao dịch → producer/consumer bị treo.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "rawSql": "SELECT 'market_trade' AS \"Bảng\", MAX(exchange_ts) AS \"Insert Cuối\", ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(exchange_ts)))::numeric, 1) AS \"Giây Trước\" FROM market_trade WHERE market_id IN ($market_id) UNION ALL SELECT 'order_book_l2', MAX(exchange_ts), ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(exchange_ts)))::numeric, 1) FROM order_book_l2 WHERE market_id IN ($market_id) UNION ALL SELECT 'market_index', MAX(exchange_ts), ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(exchange_ts)))::numeric, 1) FROM market_index WHERE market_id IN ($market_id) UNION ALL SELECT 'expected_price', MAX(producer_ts), ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(producer_ts)))::numeric, 1) FROM expected_price WHERE market_id IN ($market_id) UNION ALL SELECT 'foreign_investor', MAX(producer_ts), ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(producer_ts)))::numeric, 1) FROM foreign_investor WHERE market_id IN ($market_id) ORDER BY \"Giây Trước\" DESC",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Giây Trước"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 10
+                    },
+                    {
+                      "color": "red",
+                      "value": 60
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Insert Cuối"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "Giây Trước",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": false
+        },
+        "showHeader": true
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "📥 Ingestion Rate — Rows/phút mỗi bảng",
+      "description": "Số dòng được insert vào DB mỗi phút. Đường phẳng 0 trong giờ giao dịch = pipeline bị đứt.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', exchange_ts) AS time, 'market_trade' AS metric, COUNT(*) AS value FROM market_trade WHERE $__timeFilter(exchange_ts) AND market_id IN ($market_id) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', exchange_ts) AS time, 'order_book_l2' AS metric, COUNT(*) AS value FROM order_book_l2 WHERE $__timeFilter(exchange_ts) AND market_id IN ($market_id) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', exchange_ts) AS time, 'market_index' AS metric, COUNT(*) AS value FROM market_index WHERE $__timeFilter(exchange_ts) AND market_id IN ($market_id) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          },
+          "unit": "short",
+          "min": 0
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max",
+            "sum"
+          ]
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "🚀 Latency market_trade (ms)",
+      "description": "exchange_ts → dnse_ts → producer_ts → ingested_ts. Chi tiết từng chặng của luồng khớp lệnh.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', exchange_ts) AS time, ROUND(AVG(EXTRACT(EPOCH FROM (dnse_ts - exchange_ts)) * 1000)::numeric, 2) AS \"Sàn→DNSE\", ROUND(AVG(EXTRACT(EPOCH FROM (producer_ts - dnse_ts)) * 1000)::numeric, 2) AS \"DNSE→SDK\", ROUND(AVG(EXTRACT(EPOCH FROM (ingested_ts - producer_ts)) * 1000)::numeric, 2) AS \"SDK→DB\", ROUND(AVG(EXTRACT(EPOCH FROM (ingested_ts - exchange_ts)) * 1000)::numeric, 2) AS \"E2E\", ROUND((PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_ts - exchange_ts)) * 1000))::numeric, 2) AS \"E2E P99\" FROM market_trade WHERE $__timeFilter(exchange_ts) AND dnse_ts IS NOT NULL AND producer_ts IS NOT NULL AND ingested_ts IS NOT NULL AND market_id IN ($market_id) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5
+          },
+          "unit": "ms",
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "E2E P99"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "🚀 Latency market_index (ms)",
+      "description": "exchange_ts → dnse_ts → producer_ts → ingested_ts. Chi tiết từng chặng của luồng chỉ số.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', exchange_ts) AS time, ROUND(AVG(EXTRACT(EPOCH FROM (dnse_ts - exchange_ts)) * 1000)::numeric, 2) AS \"Sàn→DNSE\", ROUND(AVG(EXTRACT(EPOCH FROM (producer_ts - dnse_ts)) * 1000)::numeric, 2) AS \"DNSE→SDK\", ROUND(AVG(EXTRACT(EPOCH FROM (ingested_ts - producer_ts)) * 1000)::numeric, 2) AS \"SDK→DB\", ROUND(AVG(EXTRACT(EPOCH FROM (ingested_ts - exchange_ts)) * 1000)::numeric, 2) AS \"E2E\" FROM market_index WHERE $__timeFilter(exchange_ts) AND dnse_ts IS NOT NULL AND producer_ts IS NOT NULL AND ingested_ts IS NOT NULL AND market_id IN ($market_id) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5
+          },
+          "unit": "ms",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      }
+    },
+  {
+    "id": 8,
+    "type": "timeseries",
+    "title": "🚀 Latency order_book_l2 (ms)",
+    "description": "exchange_ts → dnse_ts → producer_ts → ingested_ts. Chi tiết từng chặng của luồng sổ lệnh.",
+    "datasource": {
+      "type": "postgres",
+      "uid": "timescaledb"
+    },
+    "targets": [
+      {
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "rawSql": "SELECT time_bucket('1 minute', exchange_ts) AS time, ROUND(AVG(EXTRACT(EPOCH FROM (dnse_ts - exchange_ts)) * 1000)::numeric, 2) AS \"Sàn→DNSE\", ROUND(AVG(EXTRACT(EPOCH FROM (producer_ts - dnse_ts)) * 1000)::numeric, 2) AS \"DNSE→SDK\", ROUND(AVG(EXTRACT(EPOCH FROM (ingested_ts - producer_ts)) * 1000)::numeric, 2) AS \"SDK→DB\", ROUND(AVG(EXTRACT(EPOCH FROM (ingested_ts - exchange_ts)) * 1000)::numeric, 2) AS \"E2E\" FROM order_book_l2 WHERE $__timeFilter(exchange_ts) AND dnse_ts IS NOT NULL AND producer_ts IS NOT NULL AND ingested_ts IS NOT NULL AND market_id IN ($market_id) GROUP BY 1 ORDER BY 1",
+        "format": "time_series",
+        "refId": "A"
+      }
+    ],
+    "fieldConfig": {
+      "defaults": {
+        "color": {
+          "mode": "palette-classic"
+        },
+        "custom": {
+          "lineWidth": 2,
+          "fillOpacity": 5
+        },
+        "unit": "ms",
+        "min": 0
+      },
+      "overrides": []
+    },
+    "options": {
+      "tooltip": {
+        "mode": "multi"
+      },
+      "legend": {
+        "displayMode": "table",
+        "placement": "bottom",
+        "showLegend": true,
+        "calcs": [
+          "mean",
+          "max"
+        ]
+      }
+    },
+    "gridPos": {
+      "h": 8,
+      "w": 12,
+      "x": 0,
+      "y": 23
+    }
+  },
+  {
+    "id": 9,
+    "type": "timeseries",
+    "title": "🚀 Latency foreign_investor (ms)",
+    "description": "exchange_ts → producer_ts → ingested_ts. Độ trễ luồng nhà đầu tư nước ngoài.",
+    "datasource": {
+      "type": "postgres",
+      "uid": "timescaledb"
+    },
+    "targets": [
+      {
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "rawSql": "SELECT time_bucket('1 minute', exchange_ts) AS time, ROUND(AVG(EXTRACT(EPOCH FROM (producer_ts - exchange_ts)) * 1000)::numeric, 2) AS \"Sàn→SDK\", ROUND(AVG(EXTRACT(EPOCH FROM (ingested_ts - producer_ts)) * 1000)::numeric, 2) AS \"SDK→DB\", ROUND(AVG(EXTRACT(EPOCH FROM (ingested_ts - exchange_ts)) * 1000)::numeric, 2) AS \"E2E\" FROM foreign_investor WHERE $__timeFilter(exchange_ts) AND producer_ts IS NOT NULL AND ingested_ts IS NOT NULL AND market_id IN ($market_id) GROUP BY 1 ORDER BY 1",
+        "format": "time_series",
+        "refId": "A"
+      }
+    ],
+    "fieldConfig": {
+      "defaults": {
+        "color": {
+          "mode": "palette-classic"
+        },
+        "custom": {
+          "lineWidth": 2,
+          "fillOpacity": 5
+        },
+        "unit": "ms",
+        "min": 0
+      },
+      "overrides": []
+    },
+    "options": {
+      "tooltip": {
+        "mode": "multi"
+      },
+      "legend": {
+        "displayMode": "table",
+        "placement": "bottom",
+        "showLegend": true,
+        "calcs": [
+          "mean",
+          "max"
+        ]
+      }
+    },
+    "gridPos": {
+      "h": 8,
+      "w": 12,
+      "x": 12,
+      "y": 23
+    }
+  },
+  {
+    "id": 4,
+    "type": "bargauge",
+    "title": "📊 Total Rows Hôm Nay",
+    "description": "Tổng số dòng đã insert vào mỗi bảng trong ngày giao dịch hiện tại.",
+    "datasource": {
+      "type": "postgres",
+      "uid": "timescaledb"
+    },
+    "targets": [
+      {
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "rawSql": "SELECT (SELECT COUNT(*) FROM market_trade WHERE (exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = CURRENT_DATE) AS market_trade, (SELECT COUNT(*) FROM order_book_l2 WHERE (exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = CURRENT_DATE) AS order_book_l2, (SELECT COUNT(*) FROM market_index WHERE (exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = CURRENT_DATE) AS market_index, (SELECT COUNT(*) FROM expected_price WHERE (producer_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = CURRENT_DATE) AS expected_price, (SELECT COUNT(*) FROM foreign_investor WHERE (producer_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = CURRENT_DATE) AS foreign_investor",
+        "format": "table",
+        "refId": "A"
+      }
+    ],
+    "fieldConfig": {
+      "defaults": {
+        "color": {
+          "mode": "palette-classic"
+        },
+        "unit": "short",
+        "min": 0
+      },
+      "overrides": []
+    },
+    "options": {
+      "reduceOptions": {
+        "calcs": [
+          "lastNotNull"
+        ],
+        "fields": "",
+        "values": true
+      },
+      "orientation": "horizontal",
+      "displayMode": "gradient",
+      "valueMode": "color",
+      "showUnfilled": true
+    },
+    "gridPos": {
+      "h": 7,
+      "w": 12,
+      "x": 0,
+      "y": 31
+    }
+  },
+  {
+    "id": 5,
+    "type": "table",
+    "title": "🕳 Data Gap Detector — Khoảng trống > 2 phút (market_trade)",
+    "description": "Liệt kê các khoảng thời gian không có tick nào. Gap trong giờ giao dịch = mất dữ liệu.",
+    "datasource": {
+      "type": "postgres",
+      "uid": "timescaledb"
+    },
+    "targets": [
+      {
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "rawSql": "SELECT to_char(bucket AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI') AS \"Bắt đầu gap\", to_char(next_bucket AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI') AS \"Kết thúc gap\", ROUND(EXTRACT(EPOCH FROM (next_bucket - bucket)) / 60, 1) AS \"Phút bị mất\" FROM (SELECT bucket, LEAD(bucket) OVER (ORDER BY bucket) AS next_bucket FROM (SELECT time_bucket('1 minute', exchange_ts) AS bucket FROM market_trade WHERE exchange_ts > NOW() - INTERVAL '6 hours' AND market_id IN ($market_id) GROUP BY 1) sub1) sub2 WHERE next_bucket - bucket > INTERVAL '2 minutes' ORDER BY \"Phút bị mất\" DESC NULLS LAST LIMIT 20",
+        "format": "table",
+        "refId": "A"
+      }
+    ],
+    "fieldConfig": {
+      "defaults": {},
+      "overrides": [
+        {
+          "matcher": {
+            "id": "byName",
+            "options": "Phút bị mất"
+          },
+          "properties": [
+            {
+              "id": "unit",
+              "value": "m"
+            },
+            {
+              "id": "custom.displayMode",
+              "value": "color-background"
+            },
+            {
+              "id": "thresholds",
+              "value": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "yellow",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 5
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "options": {
+      "sortBy": [
+        {
+          "displayName": "Phút bị mất",
+          "desc": true
+        }
+      ],
+      "footer": {
+        "show": false
+      },
+      "showHeader": true
+    },
+    "gridPos": {
+      "h": 7,
+      "w": 12,
+      "x": 12,
+      "y": 31
+    }
+  },
+  {
+    "id": 6,
+    "type": "table",
+    "title": "🗜 TimescaleDB Chunk Compression Stats",
+    "description": "Tỷ lệ nén của từng hypertable. Compression ratio cao = tiết kiệm disk tốt.",
+    "datasource": {
+      "type": "postgres",
+      "uid": "timescaledb"
+    },
+    "targets": [
+      {
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "rawSql": "SELECT hypertable_name AS \"Bảng\", COUNT(*) AS \"Tổng chunk\", COUNT(*) FILTER (WHERE is_compressed) AS \"Đã nén\", ROUND(100.0 * COUNT(*) FILTER (WHERE is_compressed) / NULLIF(COUNT(*), 0), 1) AS \"Tỷ lệ nén (%)\" FROM timescaledb_information.chunks GROUP BY 1 ORDER BY \"Tỷ lệ nén (%)\" DESC",
+        "format": "table",
+        "refId": "A"
+      }
+    ],
+    "fieldConfig": {
+      "defaults": {},
+      "overrides": [
+        {
+          "matcher": {
+            "id": "byName",
+            "options": "Tỷ lệ nén (%)"
+          },
+          "properties": [
+            {
+              "id": "unit",
+              "value": "percent"
+            },
+            {
+              "id": "custom.displayMode",
+              "value": "color-background"
+            },
+            {
+              "id": "thresholds",
+              "value": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "yellow",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 50
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "options": {
+      "sortBy": [],
+      "footer": {
+        "show": false
+      },
+      "showHeader": true
+    },
+    "gridPos": {
+      "h": 7,
+      "w": 24,
+      "x": 0,
+      "y": 38
+    }
+  },
+  {
+    "id": 9,
+    "type": "table",
+    "title": "📊 Chi tiết Dung lượng — Hypertables & Logs",
+    "description": "Dữ liệu, Index và tổng cộng của từng hypertable. Cột Log (MB) = dung lượng Docker logs ước tính từ container_fs (giới hạn 30MB/container theo cấu hình max-size 10m × 3 files).",
+    "datasource": {
+      "type": "postgres",
+      "uid": "timescaledb"
+    },
+    "targets": [
+      {
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "rawSql": "SELECT hypertable_name AS \"Bảng\", pg_size_pretty(table_bytes) AS \"Dữ liệu\", pg_size_pretty(index_bytes) AS \"Index\", pg_size_pretty(toast_bytes) AS \"TOAST\", pg_size_pretty(total_bytes) AS \"Tổng cộng\", ROUND(total_bytes / 1024.0 / 1024.0, 1) AS \"MB\" FROM timescaledb_information.hypertables CROSS JOIN LATERAL hypertable_detailed_size((hypertable_schema || '.' || hypertable_name)::regclass) UNION ALL SELECT 'Database (tổng)' AS \"Bảng\", '-' AS \"Dữ liệu\", '-' AS \"Index\", '-' AS \"TOAST\", pg_size_pretty(pg_database_size('market_data')) AS \"Tổng cộng\", ROUND(pg_database_size('market_data') / 1024.0 / 1024.0, 1) AS \"MB\" ORDER BY \"MB\" DESC",
+        "format": "table",
+        "refId": "A"
+      }
+    ],
+    "fieldConfig": {
+      "defaults": {},
+      "overrides": [
+        {
+          "matcher": {
+            "id": "byName",
+            "options": "MB"
+          },
+          "properties": [
+            {
+              "id": "unit",
+              "value": "decmbytes"
+            },
+            {
+              "id": "custom.displayMode",
+              "value": "color-background"
+            },
+            {
+              "id": "thresholds",
+              "value": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 100
+                  },
+                  {
+                    "color": "red",
+                    "value": 500
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "options": {
+      "sortBy": [
+        {
+          "displayName": "MB",
+          "desc": true
+        }
+      ],
+      "footer": {
+        "show": false
+      },
+      "showHeader": true
+    },
+    "gridPos": {
+      "h": 9,
+      "w": 24,
+      "x": 0,
+      "y": 45
+    }
+  },
+  {
+    "id": 10,
+    "type": "row",
+    "title": "🪣 MinIO Object Storage (Delta Lake)",
+    "collapsed": false,
+    "gridPos": {
+      "h": 1,
+      "w": 24,
+      "x": 0,
+      "y": 54
+    }
+  },
+  {
+    "id": 11,
+    "type": "stat",
+    "title": "📊 MinIO Storage & Objects",
+    "description": "Tổng dung lượng, số objects, tốc độ tăng trưởng dung lượng và tỷ lệ lỗi S3 API của MinIO.",
+    "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+    },
+    "targets": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "expr": "minio_cluster_usage_total_bytes",
+        "legendFormat": "Dung lượng",
+        "refId": "A"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "expr": "minio_cluster_usage_object_total",
+        "legendFormat": "Objects",
+        "refId": "B"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "expr": "minio_cluster_usage_total_bytes - (minio_cluster_usage_total_bytes offset 24h or minio_cluster_usage_total_bytes)",
+        "legendFormat": "Growth/ngày",
+        "refId": "C"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "expr": "sum(rate(minio_s3_errors_total[5m]))",
+        "legendFormat": "S3 Errors (5m)",
+        "refId": "D"
+      }
+    ],
+    "fieldConfig": {
+      "defaults": {
+        "unit": "bytes",
+        "color": {
+          "mode": "thresholds"
+        },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "color": "green",
+              "value": null
+            }
+          ]
+        }
+      },
+      "overrides": [
+        {
+          "matcher": {
+            "id": "byName",
+            "options": "Objects"
+          },
+          "properties": [
+            {
+              "id": "unit",
+              "value": "short"
+            },
+            {
+              "id": "color",
+              "value": {
+                "fixedColor": "blue",
+                "mode": "fixed"
+              }
+            }
+          ]
+        },
+        {
+          "matcher": {
+            "id": "byName",
+            "options": "Growth/ngày"
+          },
+          "properties": [
+            {
+              "id": "unit",
+              "value": "bytes"
+            },
+            {
+              "id": "thresholds",
+              "value": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 209715200
+                  },
+                  {
+                    "color": "red",
+                    "value": 524288000
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "matcher": {
+            "id": "byName",
+            "options": "S3 Errors (5m)"
+          },
+          "properties": [
+            {
+              "id": "unit",
+              "value": "short"
+            },
+            {
+              "id": "noValue",
+              "value": "0"
+            },
+            {
+              "id": "thresholds",
+              "value": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.0001
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            {
+              "id": "mappings",
+              "value": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "OK (0)",
+                      "color": "green"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "options": {
+      "reduceOptions": {
+        "calcs": [
+          "lastNotNull"
+        ],
+        "fields": "",
+        "values": false
+      },
+      "orientation": "horizontal",
+      "graphMode": "none",
+      "colorMode": "background",
+      "textMode": "value_and_name"
+    },
+    "gridPos": {
+      "h": 8,
+      "w": 12,
+      "x": 0,
+      "y": 55
+    }
+  },
+  {
+    "id": 12,
+    "type": "timeseries",
+    "title": "📈 MinIO S3 Requests Rate",
+    "description": "Tần suất các cuộc gọi API ghi (PUT) và đọc (GET) vào MinIO S3.",
+    "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+    },
+    "targets": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "expr": "rate(minio_s3_requests_total{api=\"putobject\"}[2m])",
+        "legendFormat": "PUT requests/s",
+        "refId": "A"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "expr": "rate(minio_s3_requests_total{api=\"getobject\"}[2m])",
+        "legendFormat": "GET requests/s",
+        "refId": "B"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "expr": "rate(minio_s3_requests_incoming_total[2m])",
+        "legendFormat": "Incoming requests/s",
+        "refId": "C"
+      }
+    ],
+    "fieldConfig": {
+      "defaults": {
+        "color": {
+          "mode": "palette-classic"
+        },
+        "custom": {
+          "lineWidth": 2,
+          "fillOpacity": 10
+        },
+        "unit": "reqps",
+        "min": 0
+      }
+    },
+    "options": {
+      "tooltip": {
+        "mode": "multi",
+        "sort": "desc"
+      },
+      "legend": {
+        "displayMode": "list",
+        "placement": "bottom",
+        "showLegend": true
+      }
+    },
+    "gridPos": {
+      "h": 8,
+      "w": 12,
+      "x": 12,
+      "y": 55
+    }
+  },
+  {
+    "id": 13,
+    "type": "timeseries",
+    "title": "📡 MinIO S3 Traffic Throughput",
+    "description": "Băng thông upload (ghi) và download (đọc) của MinIO S3.",
+    "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+    },
+    "targets": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "expr": "rate(minio_s3_traffic_received_bytes[2m])",
+        "legendFormat": "Băng thông ghi (Upload)",
+        "refId": "A"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "expr": "rate(minio_s3_traffic_sent_bytes[2m])",
+        "legendFormat": "Băng thông đọc (Download)",
+        "refId": "B"
+      }
+    ],
+    "fieldConfig": {
+      "defaults": {
+        "color": {
+          "mode": "palette-classic"
+        },
+        "custom": {
+          "lineWidth": 2,
+          "fillOpacity": 10
+        },
+        "unit": "Bps",
+        "min": 0
+      }
+    },
+    "options": {
+      "tooltip": {
+        "mode": "multi",
+        "sort": "desc"
+      },
+      "legend": {
+        "displayMode": "list",
+        "placement": "bottom",
+        "showLegend": true
+      }
+    },
+    "gridPos": {
+      "h": 8,
+      "w": 12,
+      "x": 0,
+      "y": 63
+    }
+  },
+  {
+    "id": 14,
+    "type": "timeseries",
+    "title": "📈 MinIO Storage Daily Growth Trend",
+    "description": "Lượng dung lượng gia tăng thực tế trong 24 giờ qua, theo dõi xu hướng tăng trưởng hàng ngày.",
+    "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+    },
+    "targets": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "expr": "minio_cluster_usage_total_bytes - (minio_cluster_usage_total_bytes offset 24h or minio_cluster_usage_total_bytes)",
+        "legendFormat": "Growth/ngày",
+        "refId": "A"
+      }
+    ],
+    "fieldConfig": {
+      "defaults": {
+        "color": {
+          "mode": "palette-classic"
+        },
+        "custom": {
+          "lineWidth": 2,
+          "fillOpacity": 10
+        },
+        "unit": "bytes"
+      }
+    },
+    "options": {
+      "tooltip": {
+        "mode": "multi",
+        "sort": "desc"
+      },
+      "legend": {
+        "displayMode": "list",
+        "placement": "bottom",
+        "showLegend": true
+      }
+    },
+    "gridPos": {
+      "h": 8,
+      "w": 12,
+      "x": 12,
+      "y": 63
+    }
+  }
+]
+}

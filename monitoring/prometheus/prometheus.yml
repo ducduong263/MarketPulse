@@ -1,0 +1,16 @@
+scrape_configs:
+  - job_name: 'cadvisor'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  - job_name: 'kafka-exporter'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['kafka-exporter:9308']
+
+  - job_name: 'minio'
+    scrape_interval: 15s
+    metrics_path: '/minio/v2/metrics/cluster'
+    static_configs:
+      - targets: ['minio:9000']

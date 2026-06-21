@@ -1,0 +1,891 @@
+{
+    "annotations": {
+        "list": []
+    },
+    "editable": true,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [
+        {
+            "title": "Overview",
+            "type": "dashboard",
+            "url": "/d/mp-overview",
+            "icon": "external link",
+            "tooltip": "System status overview",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 2 — Kafka",
+            "type": "dashboard",
+            "url": "/d/mp-kafka",
+            "icon": "external link",
+            "tooltip": "Consumer lag, messages/sec, offsets",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 3 — Storage",
+            "type": "dashboard",
+            "url": "/d/mp-storage",
+            "icon": "external link",
+            "tooltip": "Data freshness, latency, compression, disk",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 4 — Airflow",
+            "type": "dashboard",
+            "url": "/d/mp-airflow",
+            "icon": "external link",
+            "tooltip": "DAG runs, task status",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 5 — Data Quality",
+            "type": "dashboard",
+            "url": "/d/mp-data-quality",
+            "icon": "external link",
+            "tooltip": "Gap detector, price anomaly, stale data",
+            "targetBlank": false
+        }
+    ],
+    "refresh": "30s",
+    "schemaVersion": 39,
+    "tags": [
+        "marketpulse"
+    ],
+    "templating": {
+        "list": []
+    },
+    "time": {
+        "from": "now-1h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "Asia/Ho_Chi_Minh",
+    "title": "Layer 1 — Ingestion Pipeline",
+    "uid": "mp-ingestion",
+    "version": 1,
+    "panels": [
+        {
+            "id": 1,
+            "type": "text",
+            "title": "ℹ️ Ghi chú",
+            "options": {
+                "mode": "markdown",
+                "content": "### Layer 1 — Ingestion Pipeline\nDashboard này dùng bảng `pipeline_stats` trong TimescaleDB.\n\n**Yêu cầu:** Chạy `init_db/04_monitoring.sql` và triển khai code metrics trong `producer_base.py` (Bước 1 & 2 của Implementation Plan).\n\nCác panel bên dưới sẽ hiển thị dữ liệu sau khi producers bắt đầu ghi metrics."
+            },
+            "gridPos": {
+                "h": 3,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            }
+        },
+        {
+            "id": 2,
+            "type": "stat",
+            "title": "🟢 WebSocket Status (1=Connected, 0=Disconnected)",
+            "description": "Trạng thái kết nối WebSocket của từng producer. Äá» = disconnected.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT s.service_name AS metric, COALESCE((SELECT metric_value FROM pipeline_stats WHERE service_name = s.service_name AND metric_name = 'ws_connected' AND ts > NOW() - INTERVAL '1 minute' ORDER BY ts DESC LIMIT 1), 0) AS value FROM (VALUES ('p-trade'), ('p-quote'), ('p-index'), ('p-expected-price'), ('p-foreign-investor'), ('c-trade'), ('c-quote'), ('c-index'), ('c-expected-price'), ('c-foreign-investor')) AS s(service_name) ORDER BY metric",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "green",
+                                "value": 1
+                            }
+                        ]
+                    },
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "0": {
+                                    "text": "DISCONNECTED",
+                                    "color": "red"
+                                },
+                                "1": {
+                                    "text": "CONNECTED",
+                                    "color": "green"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^value$/",
+                    "values": true
+                },
+                "orientation": "horizontal",
+                "textMode": "value_and_name",
+                "colorMode": "background",
+                "text": {
+                    "titleSize": 13,
+                    "valueSize": 13
+                }
+            },
+            "gridPos": {
+                "h": 7,
+                "w": 12,
+                "x": 0,
+                "y": 3
+            }
+        },
+        {
+            "id": 3,
+            "type": "stat",
+            "title": "🔄 Reconnect Count (kể từ khi start)",
+            "description": "Số lần WebSocket reconnect. Giá trị cao = kết nối không ổn định.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT s.service_name AS metric, COALESCE((SELECT metric_value FROM pipeline_stats WHERE service_name = s.service_name AND metric_name = 'reconnect_count' AND ts > NOW() - INTERVAL '1 minute' ORDER BY ts DESC LIMIT 1), 0) AS value FROM (VALUES ('p-trade'), ('p-quote'), ('p-index'), ('p-expected-price'), ('p-foreign-investor'), ('c-trade'), ('c-quote'), ('c-index'), ('c-expected-price'), ('c-foreign-investor')) AS s(service_name) ORDER BY metric",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 3
+                            },
+                            {
+                                "color": "red",
+                                "value": 10
+                            }
+                        ]
+                    },
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^value$/",
+                    "values": true
+                },
+                "orientation": "horizontal",
+                "textMode": "value_and_name",
+                "colorMode": "background",
+                "text": {
+                    "titleSize": 13,
+                    "valueSize": 13
+                }
+            },
+            "gridPos": {
+                "h": 7,
+                "w": 12,
+                "x": 12,
+                "y": 3
+            }
+        },
+        {
+            "id": 4,
+            "type": "timeseries",
+            "title": "📨 Messages/sec per Service",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT time_bucket('1 minute', ts) AS time, service_name AS metric, AVG(metric_value) AS value FROM pipeline_stats WHERE metric_name = 'msg_per_sec' AND $__timeFilter(ts) GROUP BY 1, 2 ORDER BY 1",
+                    "format": "time_series",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 10
+                    },
+                    "unit": "mps"
+                }
+            },
+            "options": {
+                "tooltip": {
+                    "mode": "multi"
+                },
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 10
+            }
+        },
+        {
+            "id": 5,
+            "type": "timeseries",
+            "title": "❌ Avro Serialize Error Count",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT time_bucket('5 minutes', ts) AS time, service_name AS metric, SUM(metric_value) AS value FROM pipeline_stats WHERE metric_name = 'avro_error_count' AND $__timeFilter(ts) GROUP BY 1, 2 ORDER BY 1",
+                    "format": "time_series",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "red"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 20
+                    },
+                    "unit": "short"
+                }
+            },
+            "options": {
+                "tooltip": {
+                    "mode": "multi"
+                },
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 10
+            }
+        },
+        {
+            "id": 6,
+            "type": "timeseries",
+            "title": "📊 Kafka Consumer Lag (từ Prometheus)",
+            "description": "Consumer lag của các group timescaledb-*. Cao > 1000 = consumer bị quá tải.",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "sum by(consumergroup, topic) (kafka_consumergroup_lag{consumergroup=~\"timescaledb-.*\"})",
+                    "legendFormat": "{{consumergroup}} - {{topic}}",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 10
+                    },
+                    "unit": "short",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 100
+                            },
+                            {
+                                "color": "red",
+                                "value": 1000
+                            }
+                        ]
+                    }
+                }
+            },
+            "options": {
+                "tooltip": {
+                    "mode": "multi"
+                },
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 18
+            }
+        },
+        {
+            "id": 7,
+            "type": "state-timeline",
+            "title": "🔌 Connection Status per Service (Online / Offline)",
+            "description": "Dải xanh = Online, Äá» = Offline. Hover vào vùng Ä‘á» để xem thá»i gian bị mất kết nối. Mỗi láº§n restart container hoặc mất máº¡ng Ä‘á»u Ä‘Æ°á»£c ghi nhận.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT\n  $__timeFrom() AS time,\n  s.service_name AS metric,\n  COALESCE(\n    (\n      SELECT metric_value\n      FROM pipeline_stats\n      WHERE service_name = s.service_name\n        AND metric_name = 'connection_status'\n        AND ts <= $__timeFrom()\n      ORDER BY ts DESC\n      LIMIT 1\n    ), 0.0\n  ) AS value\nFROM (\n  VALUES\n    ('p-trade'), ('p-quote'), ('p-index'), ('p-expected-price'), ('p-foreign-investor'),\n    ('c-trade'), ('c-quote'), ('c-index'), ('c-expected-price'), ('c-foreign-investor')\n) AS s(service_name)\n\nUNION ALL\n\nSELECT\n  ts AS time,\n  service_name AS metric,\n  metric_value AS value\nFROM pipeline_stats\nWHERE metric_name = 'connection_status'\n  AND $__timeFilter(ts)\n\nUNION ALL\n\nSELECT\n  $__timeTo() AS time,\n  s.service_name AS metric,\n  COALESCE(\n    (\n      SELECT metric_value\n      FROM pipeline_stats\n      WHERE service_name = s.service_name\n        AND metric_name = 'connection_status'\n        AND ts <= $__timeTo()\n      ORDER BY ts DESC\n      LIMIT 1\n    ), 0.0\n  ) AS value\nFROM (\n  VALUES\n    ('p-trade'), ('p-quote'), ('p-index'), ('p-expected-price'), ('p-foreign-investor'),\n    ('c-trade'), ('c-quote'), ('c-index'), ('c-expected-price'), ('c-foreign-investor')\n) AS s(service_name)\n\nORDER BY time",
+                    "format": "time_series",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "lineWidth": 1,
+                        "fillOpacity": 70,
+                        "connectNullValues": "always",
+                        "spanNulls": true
+                    },
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "0": {
+                                    "text": "Offline",
+                                    "color": "red",
+                                    "index": 0
+                                }
+                            }
+                        },
+                        {
+                            "type": "value",
+                            "options": {
+                                "1": {
+                                    "text": "Online",
+                                    "color": "green",
+                                    "index": 1
+                                }
+                            }
+                        }
+                    ],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "green",
+                                "value": 1
+                            }
+                        ]
+                    },
+                    "color": {
+                        "mode": "thresholds"
+                    }
+                }
+            },
+            "options": {
+                "mergeValues": true,
+                "showValue": "never",
+                "alignValue": "center",
+                "rowHeight": 0.85,
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 26
+            }
+        },
+        {
+            "id": 8,
+            "type": "row",
+            "title": "📋 Instrument Master — Danh mục mã đang Subscribe",
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 34
+            }
+        },
+        {
+            "id": 9,
+            "type": "stat",
+            "title": "Mã Subscribe theo Sàn (dynamic filter)",
+            "description": "Số mã chứng khoán đang được subscribe, phân theo sàn. Bộ lọc (board_id, status, admin, sanction, market, indexes, groups) được tải động từ bảng pipeline_config trong DB.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT\n  CASE sd.market_id\n    WHEN 'STO' THEN 'HOSE'\n    WHEN 'STX' THEN 'HNX'\n    WHEN 'UPX' THEN 'UPCOM'\n    WHEN 'DVX' THEN 'Phai sinh'\n    WHEN 'HCX' THEN 'CW'\n    ELSE sd.market_id\n  END AS metric,\n  COUNT(DISTINCT sd.symbol) AS value\nFROM security_definition sd\nJOIN instrument_master im\n  ON sd.symbol = im.symbol AND sd.market_id = im.market_id\nWHERE sd.trading_date = CURRENT_DATE\n  AND sd.board_id = (SELECT value FROM pipeline_config WHERE key = 'symbol_filter_board_id')\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_status'), '') = ''\n    OR sd.security_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_status'), ','))\n  )\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_admin'), '') = ''\n    OR sd.admin_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_admin'), ','))\n  )\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_sanction'), '') = ''\n    OR sd.trading_sanction_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_sanction'), ','))\n  )\n  AND im.is_active = true\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_market'), '') = ''\n    OR sd.market_id = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_market'), ','))\n  )\n  AND (\n    (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), '') = ''\n      AND COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), '') = ''\n    )\n    OR (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), '') <> ''\n      AND string_to_array(im.index_name, ',') && string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), ',')\n    )\n    OR (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), '') <> ''\n      AND im.security_group_id = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), ','))\n    )\n  )\nGROUP BY sd.market_id\nORDER BY metric",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "blue"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "blue",
+                                "value": null
+                            }
+                        ]
+                    },
+                    "unit": "short",
+                    "mappings": []
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^value$/",
+                    "values": true
+                },
+                "orientation": "horizontal",
+                "textMode": "value_and_name",
+                "colorMode": "background",
+                "text": {
+                    "titleSize": 14,
+                    "valueSize": 28
+                },
+                "graphMode": "none"
+            },
+            "gridPos": {
+                "h": 5,
+                "w": 14,
+                "x": 0,
+                "y": 35
+            }
+        },
+        {
+            "id": 10,
+            "type": "stat",
+            "title": "🔢 Tổng mã Subscribe",
+            "description": "Tổng số mã đang được subscribe với bộ lọc động từ bảng pipeline_config trong DB.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT\n  COUNT(DISTINCT sd.symbol) AS value\nFROM security_definition sd\nJOIN instrument_master im\n  ON sd.symbol = im.symbol AND sd.market_id = im.market_id\nWHERE sd.trading_date = CURRENT_DATE\n  AND sd.board_id = (SELECT value FROM pipeline_config WHERE key = 'symbol_filter_board_id')\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_status'), '') = ''\n    OR sd.security_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_status'), ','))\n  )\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_admin'), '') = ''\n    OR sd.admin_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_admin'), ','))\n  )\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_sanction'), '') = ''\n    OR sd.trading_sanction_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_sanction'), ','))\n  )\n  AND im.is_active = true\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_market'), '') = ''\n    OR sd.market_id = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_market'), ','))\n  )\n  AND (\n    (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), '') = ''\n      AND COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), '') = ''\n    )\n    OR (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), '') <> ''\n      AND string_to_array(im.index_name, ',') && string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), ',')\n    )\n    OR (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), '') <> ''\n      AND im.security_group_id = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), ','))\n    )\n  )",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "green"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    },
+                    "unit": "short",
+                    "mappings": []
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^value$/",
+                    "values": false
+                },
+                "orientation": "auto",
+                "textMode": "value_and_name",
+                "colorMode": "background",
+                "text": {
+                    "titleSize": 14,
+                    "valueSize": 36
+                },
+                "graphMode": "none"
+            },
+            "gridPos": {
+                "h": 5,
+                "w": 4,
+                "x": 14,
+                "y": 35
+            }
+        },
+        {
+            "id": 11,
+            "type": "stat",
+            "title": "📅 Mã đáo hạn trong 7 ngày tới",
+            "description": "Số mã phái sinh/chứng quyền (is_active=true) sẽ đến hạn trong 7 ngày kế tiếp (không tính hôm nay). Nếu > 0 cần theo dõi để xử lý sau khi deactivate.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT\n  COUNT(DISTINCT sd.symbol) AS value\nFROM security_definition sd\nJOIN instrument_master im\n  ON sd.symbol = im.symbol AND sd.market_id = im.market_id\nWHERE sd.trading_date = CURRENT_DATE\n  AND sd.final_trade_date > CURRENT_DATE\n  AND sd.final_trade_date <= CURRENT_DATE + INTERVAL '7 days'\n  AND im.is_active = true",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 1
+                            },
+                            {
+                                "color": "orange",
+                                "value": 10
+                            }
+                        ]
+                    },
+                    "unit": "short",
+                    "mappings": []
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^value$/",
+                    "values": false
+                },
+                "orientation": "auto",
+                "textMode": "value_and_name",
+                "colorMode": "background",
+                "text": {
+                    "titleSize": 13,
+                    "valueSize": 36
+                },
+                "graphMode": "none"
+            },
+            "gridPos": {
+                "h": 5,
+                "w": 6,
+                "x": 18,
+                "y": 35
+            }
+        },
+        {
+            "id": 12,
+            "type": "table",
+            "title": "📋 Chi tiết mã sắp đáo hạn (14 ngày tới)",
+            "description": "Danh sách các mã phái sinh/chứng quyền đang active và sẽ đáo hạn trong 14 ngày tới, sorted theo ngày đáo hạn gần nhất.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT\n  sd.symbol                        AS \"Symbol\",\n  CASE sd.market_id\n    WHEN 'STO' THEN 'HOSE'\n    WHEN 'DVX' THEN 'Phai sinh'\n    WHEN 'HCX' THEN 'CW'\n    ELSE sd.market_id\n  END                              AS \"San\",\n  sd.security_group_id             AS \"Loai\",\n  sd.final_trade_date              AS \"Ngay dao han\",\n  (sd.final_trade_date - CURRENT_DATE) AS \"Con lai (ngay)\"\nFROM security_definition sd\nJOIN instrument_master im\n  ON sd.symbol = im.symbol AND sd.market_id = im.market_id\nWHERE sd.trading_date = CURRENT_DATE\n  AND sd.final_trade_date IS NOT NULL\n  AND sd.final_trade_date > CURRENT_DATE\n  AND sd.final_trade_date <= CURRENT_DATE + INTERVAL '14 days'\n  AND im.is_active = true\nORDER BY sd.final_trade_date, sd.symbol",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 3
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 5
+                            },
+                            {
+                                "color": "green",
+                                "value": 8
+                            }
+                        ]
+                    },
+                    "custom": {
+                        "align": "left",
+                        "cellOptions": {
+                            "type": "color-background",
+                            "mode": "basic"
+                        }
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Symbol"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 120
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "auto"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "San"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 100
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "auto"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Loai"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 80
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "auto"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Ngay dao han"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 140
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "auto"
+                                }
+                            },
+                            {
+                                "id": "unit",
+                                "value": "dateTimeAsLocal"
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Con lai (ngay)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 130
+                            },
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "basic"
+                                }
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "color": "red",
+                                            "value": null
+                                        },
+                                        {
+                                            "color": "orange",
+                                            "value": 3
+                                        },
+                                        {
+                                            "color": "yellow",
+                                            "value": 5
+                                        },
+                                        {
+                                            "color": "green",
+                                            "value": 8
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "Con lai (ngay)",
+                        "desc": false
+                    }
+                ],
+                "footer": {
+                    "show": false
+                },
+                "showHeader": true,
+                "cellHeight": "sm"
+            },
+            "gridPos": {
+                "h": 7,
+                "w": 24,
+                "x": 0,
+                "y": 40
+            }
+        }
+    ]
+}

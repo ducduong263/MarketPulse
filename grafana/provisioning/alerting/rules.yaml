@@ -1,0 +1,16 @@
+apiVersion: 1
+
+# ── Alert Rules ────────────────────────────────────────────────────────────────
+# Grafana 11 alert rule YAML format khác với Grafana 8/9.
+# Các alert rule được tạo trực tiếp trong Grafana UI:
+#   localhost:3000 > Alerting > Alert Rules > New Alert Rule
+#
+# Alert cần tạo:
+#   1. KafkaConsumerLagHigh  — Prometheus: kafka_consumergroup_lag > 1000, for: 2m
+#   2. ContainerRestarted    — Prometheus: increase(container_restart_count[5m]) > 0
+#   3. DataStaleTrade        — TimescaleDB: freshness market_trade > 60s
+#   4. SecdefMissed          — TimescaleDB: security_definition count hôm nay < 200
+#   5. PriceAnomaly          — TimescaleDB: count price anomaly > 0
+# ──────────────────────────────────────────────────────────────────────────────
+
+groups: []

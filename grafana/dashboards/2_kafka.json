@@ -1,0 +1,457 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "Overview",
+      "type": "dashboard",
+      "url": "/d/mp-overview",
+      "icon": "external link",
+      "tooltip": "System status overview",
+      "targetBlank": false
+    },
+    {
+      "title": "Layer 1 — Ingestion",
+      "type": "dashboard",
+      "url": "/d/mp-ingestion",
+      "icon": "external link",
+      "tooltip": "WebSocket status, reconnects, throughput",
+      "targetBlank": false
+    },
+    {
+      "title": "Layer 3 — Storage",
+      "type": "dashboard",
+      "url": "/d/mp-storage",
+      "icon": "external link",
+      "tooltip": "Data freshness, latency, compression, disk",
+      "targetBlank": false
+    },
+    {
+      "title": "Layer 4 — Airflow",
+      "type": "dashboard",
+      "url": "/d/mp-airflow",
+      "icon": "external link",
+      "tooltip": "DAG runs, task status",
+      "targetBlank": false
+    },
+    {
+      "title": "Layer 5 — Data Quality",
+      "type": "dashboard",
+      "url": "/d/mp-data-quality",
+      "icon": "external link",
+      "tooltip": "Gap detector, price anomaly, stale data",
+      "targetBlank": false
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "marketpulse"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "Asia/Ho_Chi_Minh",
+  "title": "Layer 2 — Kafka & Streaming",
+  "uid": "mp-kafka",
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "📉 Consumer Lag per Group",
+      "description": "Khoảng cách giữa producer đẩy vào và consumer hút ra. Lag > 1000 = consumer quá tải.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by(consumergroup, topic) (kafka_consumergroup_lag{consumergroup=~\"timescaledb-.*\"})",
+          "legendFormat": "{{consumergroup}} [{{topic}}]",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "last",
+            "max"
+          ]
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "📈 Messages In/sec per Topic",
+      "description": "Tốc độ tin nhắn mới được producer đẩy vào Kafka theo từng topic.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(kafka_topic_partition_current_offset{topic=~\"market\\\\..*\"}[1m])",
+          "legendFormat": "{{topic}} [p{{partition}}]",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          },
+          "unit": "mps"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "⚠️ Under-Replicated Partitions",
+      "description": "Số partition đang bị under-replicated. > 0 = có vấn đề với broker.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "kafka_topic_partition_under_replicated_partition{topic=~\"market\\\\..*\"}",
+          "legendFormat": "{{topic}} [p{{partition}}]",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          },
+          "custom": {
+            "lineWidth": 2
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "📋 Consumer Group Status",
+      "description": "Trạng thái hiện tại của các consumer groups.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by(consumergroup, topic) (kafka_consumergroup_lag{consumergroup=~\"timescaledb-.*\"})",
+          "instant": true,
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Lag"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "Lag",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": false
+        },
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {}
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "consumergroup": 0,
+              "topic": 1,
+              "Value": 2
+            },
+            "renameByName": {
+              "consumergroup": "Consumer Group",
+              "topic": "Topic"
+            }
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "💾 Container CPU Usage (%)",
+      "description": "CPU usage của các container p-* và c-* (cAdvisor).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(container_cpu_usage_seconds_total{name=~\"p-.*|c-.*|kafka|timescaledb\"}[2m]) * 100",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "🧠 Container Memory Usage (MB)",
+      "description": "RAM usage của các container quan trọng (cAdvisor).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "container_memory_usage_bytes{name=~\"p-.*|c-.*|kafka|timescaledb|minio\"} / 1024 / 1024",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5
+          },
+          "unit": "decmbytes"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      }
+    }
+  ]
+}
