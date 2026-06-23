@@ -5,10 +5,17 @@
 #   docker compose -f docker-compose.yml -f airflow/docker-compose.yml --profile debug run --rm airflow-cli
 # ─────────────────────────────────────────────────────────────────────────────
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 x-airflow-common: &airflow-common
   image: apache/airflow:3.2.1-python3.12
   env_file:
     - .env
+  logging: *default-logging
   environment:
     # ── Executor ─────────────────────────────────────────────────────────────
     &airflow-common-env
@@ -36,6 +43,7 @@ x-airflow-common: &airflow-common
     MINIO_ENDPOINT: minio:9000
     KAFKA_BOOTSTRAP: kafka:29092
     SCHEMA_REGISTRY_URL: http://schema-registry:8081
+    postgres_host: timescaledb
 
     # ── Custom packages (via mounted requirements.txt) ─────
     _PIP_ADDITIONAL_REQUIREMENTS: "-r /opt/airflow/requirements.txt"
@@ -65,6 +73,7 @@ services:
     image: postgres:17-alpine
     container_name: airflow-postgres
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow

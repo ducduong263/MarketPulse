@@ -51,6 +51,8 @@ create table if not exists order_book_l2 (
         generated always as (ask_price1 - bid_price1) stored,
 
     exchange_ts     timestamptz     not null,
+    dnse_ts         timestamptz,
+    producer_ts     timestamptz,
     ingested_ts     timestamptz     default clock_timestamp()
 );
 
@@ -246,6 +248,7 @@ CREATE TABLE IF NOT EXISTS instrument_master (
     security_group_id   text,
     symbol_type         text,
     listed_date         date,
+    final_trade_date    date,
     short_name          text,
     full_name           text,
     index_name          text,

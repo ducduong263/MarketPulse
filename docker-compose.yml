@@ -34,6 +34,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${minio_root_user}
       MINIO_ROOT_PASSWORD: ${minio_root_password}
+      MINIO_PROMETHEUS_AUTH_TYPE: "public"
     ports:
       - "127.0.0.1:9005:9000"
       - "127.0.0.1:9001:9001"
@@ -111,9 +112,12 @@ services:
       POSTGRES_USER: ${postgres_user}
       POSTGRES_PASSWORD: ${postgres_password}
       POSTGRES_DB: ${postgres_db}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/etc/grafana/dashboards
     depends_on:
       timescaledb:
         condition: service_healthy

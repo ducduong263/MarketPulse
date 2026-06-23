@@ -198,7 +198,7 @@ def vacuum_delta_table(
         deleted = dt.vacuum(
             retention_hours=retention_hours,
             dry_run=False,
-            enforce_retention_duration=True,
+            enforce_retention_duration=False, # change to True if you want to enforce retention duration
         )
         count = len(deleted)
         logger.info("[VACUUM] %s: deleted %d files", uri, count)

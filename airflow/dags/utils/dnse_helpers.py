@@ -142,10 +142,14 @@ def _parse_index_name(v) -> str | None:
     return str(v)
 
 
-def _instrument_dict_to_row(inst: dict) -> tuple | None:
+def _instrument_dict_to_row(inst: dict, final_trade_date=None) -> tuple | None:
     """
     Convert a raw DNSE instrument dict to a tuple for instrument_master upsert.
     Returns None if symbol or market_id is missing.
+
+    Args:
+        inst:             Raw instrument dict from DNSE API.
+        final_trade_date: Optional date — final trade date from security_definition.
     """
     symbol    = inst.get("symbol") or inst.get("ticker")
     market_id = inst.get("marketId") or inst.get("market_id")
@@ -158,6 +162,7 @@ def _instrument_dict_to_row(inst: dict) -> tuple | None:
         inst.get("securityGroupId") or inst.get("security_group_id"),
         inst.get("symbolType")      or inst.get("symbol_type"),
         _parse_date(inst.get("listedDate") or inst.get("listed_date")),
+        final_trade_date,
         inst.get("shortName")  or inst.get("short_name"),
         inst.get("name")       or inst.get("fullName"),
         _parse_index_name(inst.get("indexName") or inst.get("index_name")),
@@ -265,7 +270,12 @@ def build_instrument_rows(instruments: list[dict]) -> list[tuple]:
     Returns:
         List of tuples matching instrument_master column order:
         (symbol, market_id, security_group_id, symbol_type,
-         listed_date, short_name, full_name, index_name, is_active)
+         listed_date, final_trade_date, short_name, full_name, index_name, is_active)
+
+    Note:
+        final_trade_date is always None here — the DNSE instruments endpoint does not
+        return expiry dates. It will be filled in via ON CONFLICT COALESCE from secdef
+        during upsert, or populated by the backfill migration.
     """
     rows = []
 
