@@ -90,6 +90,7 @@ async def main():
         schema_path=SCHEMA_PATH,
         to_dict_fn=_mi_to_dict,
         producer_config={"linger.ms": 200},
+        service_name="p-index",
     )
 
     print(f"[CONFIG] Indices: {MARKET_INDICES}")

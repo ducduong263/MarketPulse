@@ -199,8 +199,15 @@ class DeltaLakeArchiver:
         try:
             s3.head_bucket(Bucket=self._minio_bucket)
         except ClientError:
-            s3.create_bucket(Bucket=self._minio_bucket)
-            print(f"[MINIO] Created bucket: {self._minio_bucket}")
+            try:
+                s3.create_bucket(Bucket=self._minio_bucket)
+                print(f"[MINIO] Created bucket: {self._minio_bucket}")
+            except ClientError as e:
+                error_code = e.response["Error"].get("Code", "")
+                if error_code in ("BucketAlreadyOwnedByYou", "BucketAlreadyExists"):
+                    pass  # Bucket exists, safe to continue
+                else:
+                    raise
 
     def _create_consumer(self) -> DeserializingConsumer:
         schema_str = self._schema_path.read_text(encoding="utf-8")

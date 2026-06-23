@@ -62,6 +62,7 @@ if __name__ == "__main__":
         insert_sql=INSERT_SQL,
         record_to_row_fn=_record_to_row,
         batch_size=100,
-        batch_timeout=2.0,
+        batch_timeout=0.5,
         allowed_boards=ALLOWED_BOARDS,
+        service_name="c-trade",
     ).run()

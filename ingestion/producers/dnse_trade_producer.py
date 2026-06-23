@@ -20,12 +20,11 @@ from ingestion.common.symbol_resolver import SymbolResolver
 
 load_dotenv()
 
-# ── Config ────────────────────────────────────────────────────────
+# ── Config ─────────────────────────────────────────────────────
 KAFKA_TOPIC = "market.trade"
 
 _resolver = SymbolResolver()
 print(f"[CONFIG] Filter: {_resolver.describe()}")
-SYMBOLS = _resolver.resolve()
 
 SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schemas" / "market_trade.avsc"
 
@@ -68,27 +67,40 @@ def _trade_to_dict(trade: TradeExtra, _ctx) -> dict:
     }
 
 
-# ── Main ──────────────────────────────────────────────────────────
+# ── Main ─────────────────────────────────────────────────────
 async def main():
+    symbols = _resolver.resolve()
+    print(f"[CONFIG] Symbols ({len(symbols)}): {symbols}")
+
+    async def _resubscribe(client, new_symbols: list[str]):
+        """Hot-reload: subscribe to additional symbols only."""
+        await client.subscribe_trade_extra(
+            symbols=new_symbols,
+            on_trade_extra=lambda trade: producer.produce(trade.symbol, trade),
+            encoding="msgpack",
+        )
+        print(f"[SUBSCRIBED] +{len(new_symbols)} symbols via hot-reload")
+
     producer = DnseKafkaProducer(
         topic=KAFKA_TOPIC,
         schema_path=SCHEMA_PATH,
         to_dict_fn=_trade_to_dict,
         producer_config={"linger.ms": 50, "batch.num.messages": 500},
+        service_name="p-trade",
+        symbol_resolver=_resolver,
+        resubscribe_fn=_resubscribe,
     )
-
-    print(f"[CONFIG] Symbols: {SYMBOLS}")
 
     async def subscribe_fn(client):
         await client.subscribe_trade_extra(
-            symbols=SYMBOLS,
+            symbols=symbols,
             on_trade_extra=lambda trade: producer.produce(trade.symbol, trade),
             encoding="msgpack",
         )
-        print(f"[SUBSCRIBED] trade_extra for {len(SYMBOLS)} symbols")
+        print(f"[SUBSCRIBED] trade_extra for {len(symbols)} symbols")
 
     await producer.run(subscribe_fn)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main())

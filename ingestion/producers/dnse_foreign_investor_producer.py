@@ -75,6 +75,7 @@ async def main():
         schema_path=SCHEMA_PATH,
         to_dict_fn=_fi_to_dict,
         producer_config={"linger.ms": 200},
+        service_name="p-foreign-investor",
     )
 
     print(f"[CONFIG] Board: {BOARD_ID} | Symbols: {len(SYMBOLS)}")

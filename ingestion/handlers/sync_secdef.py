@@ -186,7 +186,7 @@ async def main(timeout: int | None):
     print("[SUCCESS] Connected to DNSE WebSocket!")
 
     await client.subscribe_sec_def(
-        symbols=["*"],
+        symbols=[""], # change from "*" to ""
         on_sec_def=handle_secdef,
         encoding="msgpack",
         board_id="G1",

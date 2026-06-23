@@ -9,6 +9,7 @@ Handles:
 - Batch insert with execute_values
 - Graceful shutdown (SIGINT/SIGTERM)
 - Optional board_id filtering (ALLOWED_BOARDS)
+- StatsReporter: periodic flush of health metrics to pipeline_stats table
 """
 from __future__ import annotations
 
@@ -20,11 +21,12 @@ from typing import Callable
 
 import psycopg2
 import psycopg2.extras
-from confluent_kafka import DeserializingConsumer, KafkaError
+from confluent_kafka import DeserializingConsumer, KafkaError, TopicPartition
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
 
 from .avro_utils import unwrap_union, ms_to_ts  # noqa: F401 — re-exported for consumers
+from .stats_reporter import StatsReporter
 
 
 class KafkaTimescaleConsumer:
@@ -64,6 +66,7 @@ class KafkaTimescaleConsumer:
         batch_size: int = 100,
         batch_timeout: float = 2.0,
         allowed_boards: set | None = None,
+        service_name: str | None = None,
     ) -> None:
         self.topic = topic
         self.consumer_group = consumer_group
@@ -73,6 +76,10 @@ class KafkaTimescaleConsumer:
         self._batch_size = batch_size
         self._batch_timeout = batch_timeout
         self._allowed_boards = allowed_boards  # None means accept all boards
+
+        # ── Stats reporter ─────────────────────────────────────────
+        _svc = service_name or self.__class__.__name__.lower()
+        self._stats = StatsReporter(service_name=_svc)
 
     # ── Public API ────────────────────────────────────────────────
 
@@ -85,19 +92,40 @@ class KafkaTimescaleConsumer:
           4. Commit Kafka offset after successful DB commit
           5. Graceful shutdown on SIGINT/SIGTERM + final flush
         """
-        consumer = self._create_consumer()
-        conn = self._create_db_conn()
-        consumer.subscribe([self.topic])
+        consumer = None
+        conn = None
+        try:
+            consumer = self._create_consumer()
+            conn = self._create_db_conn()
+            consumer.subscribe([self.topic])
+        except Exception as e:
+            if consumer is not None:
+                try:
+                    consumer.close()
+                except Exception:
+                    pass
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            raise e
 
         batch: list[tuple] = []
         last_flush = time.monotonic()
+        last_lag_check = time.monotonic()
+        last_skip_commit = time.monotonic()   # periodic commit for skipped msgs
         total_rows = 0
         skipped = 0
+        skipped_since_commit = 0              # skipped since last explicit commit
 
         print(f"[START] Consumer group: {self.consumer_group}")
         print(f"[CONFIG] Topic: {self.topic} | Batch: {self._batch_size} | Timeout: {self._batch_timeout}s")
         if self._allowed_boards:
             print(f"[CONFIG] Board filter: {self._allowed_boards}")
+
+        self._stats.start()
+        self._stats.mark_online()  # consumer is running
 
         running = True
 
@@ -127,8 +155,10 @@ class KafkaTimescaleConsumer:
                                 board = record.get("board_id", "")
                                 if board not in self._allowed_boards:
                                     skipped += 1
+                                    skipped_since_commit += 1
                                     continue
                             batch.append(self._record_to_row_fn(record))
+                            self._stats.inc_msg()
 
                 now = time.monotonic()
                 should_flush = (
@@ -141,17 +171,55 @@ class KafkaTimescaleConsumer:
                     total_rows += len(batch)
                     batch.clear()
                     last_flush = now
+                    last_skip_commit = now     # _flush_batch already calls commit()
+                    skipped_since_commit = 0
+
+                # ── Periodic commit for skipped (filtered) messages ─
+                # Ensures non-G1 messages don't accumulate as permanent
+                # consumer lag when the batch never fills (e.g. end of day)
+                elif skipped_since_commit > 0 and now - last_skip_commit >= 5:
+                    try:
+                        consumer.commit()
+                        last_skip_commit = now
+                        skipped_since_commit = 0
+                    except Exception:
+                        pass  # best-effort, not critical
+
+                # ── Consumer lag check every 10s ───────────────────
+                if now - last_lag_check >= 10:
+                    self._update_lag(consumer)
+                    last_lag_check = now
 
         finally:
-            if batch:
+            if batch and conn is not None and consumer is not None:
                 self._flush_batch(conn, consumer, batch, total_rows)
                 total_rows += len(batch)
-            consumer.close()
-            conn.close()
+            self._stats.mark_offline()  # consumer shutting down
+            self._stats.stop()  # final metrics flush
+            if consumer is not None:
+                consumer.close()
+            if conn is not None:
+                conn.close()
             skip_msg = f" | Skipped (board filter): {skipped}" if self._allowed_boards else ""
             print(f"[DONE] Inserted: {total_rows} rows{skip_msg}")
 
     # ── Internal ──────────────────────────────────────────────────
+
+    def _update_lag(self, consumer: DeserializingConsumer) -> None:
+        """Query current consumer lag from Kafka and report to StatsReporter."""
+        try:
+            partitions = consumer.assignment()
+            if not partitions:
+                return
+            total_lag = 0
+            for tp in partitions:
+                lo, hi = consumer.get_watermark_offsets(tp, timeout=0.5, cached=True)
+                committed = consumer.committed([tp], timeout=0.5)
+                current = committed[0].offset if committed and committed[0].offset >= 0 else lo
+                total_lag += max(0, hi - current)
+            self._stats.set_consumer_lag(float(total_lag), self.topic)
+        except Exception:
+            pass  # lag check is best-effort
 
     def _create_consumer(self) -> DeserializingConsumer:
         schema_str = self._schema_path.read_text(encoding="utf-8")
@@ -168,13 +236,23 @@ class KafkaTimescaleConsumer:
         })
 
     def _create_db_conn(self):
-        return psycopg2.connect(
-            host=os.getenv("postgres_host", "localhost"),
-            port=os.getenv("postgres_port", "5432"),
-            dbname=os.getenv("postgres_db", "market_data"),
-            user=os.getenv("postgres_user", "marketpulse"),
-            password=os.getenv("postgres_password", "mp_secret_2026"),
-        )
+        retries = 10
+        delay = 3
+        for i in range(retries):
+            try:
+                return psycopg2.connect(
+                    host=os.getenv("postgres_host", "localhost"),
+                    port=os.getenv("postgres_port", "5432"),
+                    dbname=os.getenv("postgres_db", "market_data"),
+                    user=os.getenv("postgres_user", "marketpulse"),
+                    password=os.getenv("postgres_password", "mp_secret_2026"),
+                )
+            except psycopg2.OperationalError as e:
+                if i < retries - 1:
+                    print(f"[DB_CONN] Database system starting or connection failed: {e}. Retrying in {delay}s... ({i+1}/{retries})")
+                    time.sleep(delay)
+                else:
+                    raise e
 
     def _flush_batch(self, conn, consumer, batch: list, total_rows: int) -> None:
         try:

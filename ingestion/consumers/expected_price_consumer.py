@@ -55,4 +55,5 @@ if __name__ == "__main__":
         record_to_row_fn=_record_to_row,
         batch_size=100,
         batch_timeout=3.0,
+            service_name="c-expected-price",
     ).run()

@@ -10,28 +10,36 @@
 #   c-trade, c-quote, c-index, c-ep, c-fi
 # ──────────────────────────────────────────────────────────────────────────────
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 x-ingestion-common: &ingestion-common
   image: marketpulse-ingestion:latest
   build:
-    context: ..              # Points to project root
+    context: .. # Points to project root
     dockerfile: ingestion/Dockerfile
   env_file:
     - ../.env
   restart: unless-stopped
+  logging: *default-logging
 
 # ── Shared environment for all services ───────────────────────────────────────
 # These OVERRIDE the .env defaults for Docker networking
 # (localhost → actual service hostnames on the shared Docker network)
 x-ingestion-env: &ingestion-env
+  PYTHONUNBUFFERED: "1" # Flush print() immediately to Docker logs
   kafka_bootstrap_servers: kafka:29092
-  schema_registry_url:     http://schema-registry:8081
-  postgres_host:           timescaledb
-  postgres_port:           "5432"
-  minio_endpoint:          minio:9000
+  schema_registry_url: http://schema-registry:8081
+  postgres_host: timescaledb
+  postgres_port: "5432"
+  minio_endpoint: minio:9000
   # Symbol resolver defaults (override per-service as needed)
-  SYMBOL_FILTER_MODE:      db
-  SYMBOL_FILTER_STATUS:    NO_HALT
-  SYMBOL_FILTER_SANCTION:  NRM
+  SYMBOL_FILTER_MODE: db
+  SYMBOL_FILTER_STATUS: NO_HALT
+  SYMBOL_FILTER_SANCTION: NRM
 
 # ═════════════════════════════════════════════════════════════════════════════
 # PRODUCERS  (WebSocket DNSE → Kafka)
@@ -45,8 +53,7 @@ services:
     command: python ingestion/producers/dnse_trade_producer.py
     environment:
       <<: *ingestion-env
-      SYMBOL_FILTER_INDEXES: VN30,VN100
-      SYMBOL_FILTER_GROUPS:  FU       # Futures/derivatives
+      SYMBOL_FILTER_GROUPS: FU # Futures/derivatives
 
   p-quote:
     <<: *ingestion-common
@@ -54,8 +61,7 @@ services:
     command: python ingestion/producers/dnse_quote_producer.py
     environment:
       <<: *ingestion-env
-      SYMBOL_FILTER_INDEXES: VN30,VN100
-      SYMBOL_FILTER_GROUPS:  FU
+      SYMBOL_FILTER_GROUPS: FU
 
   p-index:
     <<: *ingestion-common
@@ -64,7 +70,7 @@ services:
     environment:
       <<: *ingestion-env
       SYMBOL_FILTER_MODE: static
-      WATCH_SYMBOLS:      VNINDEX,VN30,HNX30,UPCOM
+      WATCH_SYMBOLS: VNINDEX,VN30,HNX30,UPCOM
 
   p-ep:
     <<: *ingestion-common
@@ -72,8 +78,7 @@ services:
     command: python ingestion/producers/dnse_expected_price_producer.py
     environment:
       <<: *ingestion-env
-      SYMBOL_FILTER_INDEXES: VN30
-      SYMBOL_FILTER_GROUPS:  ""
+      SYMBOL_FILTER_GROUPS: ""
 
   p-fi:
     <<: *ingestion-common
@@ -81,12 +86,11 @@ services:
     command: python ingestion/producers/dnse_foreign_investor_producer.py
     environment:
       <<: *ingestion-env
-      SYMBOL_FILTER_INDEXES: VN30,VN100
-      SYMBOL_FILTER_GROUPS:  ""
+      SYMBOL_FILTER_GROUPS: ""
 
-# ═════════════════════════════════════════════════════════════════════════════
-# CONSUMERS  (Kafka → TimescaleDB)
-# ═════════════════════════════════════════════════════════════════════════════
+  # ═════════════════════════════════════════════════════════════════════════════
+  # CONSUMERS  (Kafka → TimescaleDB)
+  # ═════════════════════════════════════════════════════════════════════════════
 
   c-trade:
     <<: *ingestion-common
@@ -120,6 +124,24 @@ services:
     <<: *ingestion-common
     container_name: c-fi
     command: python ingestion/consumers/foreign_investor_consumer.py
+    environment:
+      <<: *ingestion-env
+
+  # ═════════════════════════════════════════════════════════════════════════════
+  # ARCHIVERS  (Kafka → Delta Lake on MinIO)
+  # ═════════════════════════════════════════════════════════════════════════════
+
+  a-trade:
+    <<: *ingestion-common
+    container_name: a-trade
+    command: python ingestion/archivers/trade_raw_archiver.py
+    environment:
+      <<: *ingestion-env
+
+  a-quote:
+    <<: *ingestion-common
+    container_name: a-quote
+    command: python ingestion/archivers/quote_raw_archiver.py
     environment:
       <<: *ingestion-env
 

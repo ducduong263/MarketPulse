@@ -32,7 +32,7 @@ INSERT INTO order_book_l2 (
     ask_price1, ask_qty1,
     ask_price2, ask_qty2,
     ask_price3, ask_qty3,
-    exchange_ts
+    exchange_ts, dnse_ts, producer_ts
 ) VALUES %s
 """
 
@@ -55,6 +55,8 @@ def _record_to_row(record: dict) -> tuple:
         unwrap_union(record.get("ask_price3")),
         unwrap_union(record.get("ask_qty3")),
         ms_to_ts(record["exchange_ts"]),
+        ms_to_ts(unwrap_union(record.get("dnse_ts"))),
+        ms_to_ts(unwrap_union(record.get("producer_ts"))),
     )
 
 
@@ -67,6 +69,8 @@ if __name__ == "__main__":
         insert_sql=INSERT_SQL,
         record_to_row_fn=_record_to_row,
         batch_size=100,
-        batch_timeout=2.0,
+        batch_timeout=0.5,
         allowed_boards=ALLOWED_BOARDS,
+        service_name="c-quote",
     ).run()
+

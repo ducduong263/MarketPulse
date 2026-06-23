@@ -24,7 +24,6 @@ KAFKA_TOPIC = "market.orderbook-l2"
 
 _resolver = SymbolResolver()
 print(f"[CONFIG] Filter: {_resolver.describe()}")
-SYMBOLS = _resolver.resolve()
 
 SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schemas" / "order_book_l2.avsc"
 
@@ -92,22 +91,35 @@ def _quote_to_dict(quote: Quote, _ctx) -> dict:
 
 # ── Main ──────────────────────────────────────────────────────────
 async def main():
+    symbols = _resolver.resolve()
+    print(f"[CONFIG] Symbols ({len(symbols)}): {symbols}")
+
+    async def _resubscribe(client, new_symbols: list[str]):
+        """Hot-reload: subscribe to additional symbols only."""
+        await client.subscribe_quotes(
+            symbols=new_symbols,
+            on_quote=lambda quote: producer.produce(quote.symbol, quote),
+            encoding="msgpack",
+        )
+        print(f"[SUBSCRIBED] +{len(new_symbols)} symbols via hot-reload")
+
     producer = DnseKafkaProducer(
         topic=KAFKA_TOPIC,
         schema_path=SCHEMA_PATH,
         to_dict_fn=_quote_to_dict,
         producer_config={"linger.ms": 50, "batch.num.messages": 500},
+        service_name="p-quote",
+        symbol_resolver=_resolver,
+        resubscribe_fn=_resubscribe,
     )
-
-    print(f"[CONFIG] Symbols: {SYMBOLS}")
 
     async def subscribe_fn(client):
         await client.subscribe_quotes(
-            symbols=SYMBOLS,
+            symbols=symbols,
             on_quote=lambda quote: producer.produce(quote.symbol, quote),
             encoding="msgpack",
         )
-        print(f"[SUBSCRIBED] quotes for {len(SYMBOLS)} symbols")
+        print(f"[SUBSCRIBED] quotes for {len(symbols)} symbols")
 
     await producer.run(subscribe_fn)
 
