@@ -330,11 +330,30 @@ def get_active_instrument_symbols_by_market(market_id: str) -> set[str]:
     return symbols
 
 
+def get_symbols_missing_from_instrument_master() -> set[str]:
+    """
+    Return the set of symbols present in security_definition but missing from instrument_master.
+    """
+    with get_db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT DISTINCT symbol 
+                FROM security_definition 
+                WHERE symbol NOT IN (SELECT symbol FROM instrument_master)
+                """
+            )
+            rows = cur.fetchall()
+    symbols = {r[0] for r in rows}
+    logger.info("[SECDEF] Found %d symbols missing from instrument_master", len(symbols))
+    return symbols
+
+
 def get_secdef_rows_for_symbols(
-    symbols: list[str], trading_date: date_type
+    symbols: list[str]
 ) -> list[tuple]:
     """
-    Return raw security_definition rows for specific symbols on a given trading_date.
+    Return the latest raw security_definition rows for specific symbols.
     Used as fallback data source when the DNSE instruments API doesn't return a symbol.
 
     Returns list of tuples: (symbol, market_id, board_id, security_group_id, listing_date, final_trade_date)
@@ -345,19 +364,20 @@ def get_secdef_rows_for_symbols(
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT DISTINCT
+                SELECT DISTINCT ON (symbol, market_id)
                     symbol, market_id, board_id, security_group_id, listing_date, final_trade_date
                 FROM security_definition
                 WHERE symbol = ANY(%s)
-                  AND trading_date = %s
+                ORDER BY symbol, market_id, trading_date DESC
                 """,
-                (symbols, trading_date),
+                (symbols,),
             )
             rows = cur.fetchall()
     logger.info(
         "[SECDEF] Fetched %d rows for %d fallback symbol(s)", len(rows), len(symbols)
     )
     return rows
+
 
 
 def deactivate_instruments(symbols: list[str]) -> int:

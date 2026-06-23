@@ -47,6 +47,7 @@ def detect_instrument_changes(today: date) -> dict:
         get_active_instrument_symbols,
         get_all_instrument_symbols,
         get_inactive_instrument_symbols,
+        get_symbols_missing_from_instrument_master,
     )
 
     # Minimum number of symbols expected in a valid secdef snapshot.
@@ -74,6 +75,17 @@ def detect_instrument_changes(today: date) -> dict:
         len(today_secdef), len(active_instruments), len(inactive_instruments), len(all_instruments),
     )
 
+    # Symbols in secdef today but completely absent from instrument_master (never seen before)
+    new_symbols_today = today_secdef - all_instruments
+
+    # Also find any symbols ever present in security_definition but missing from IM
+    # (handles websocket sync additions from later in the day/yesterday)
+    missing_from_im = get_symbols_missing_from_instrument_master()
+    new_symbols = sorted(new_symbols_today | missing_from_im)
+
+    # Symbols that were previously deactivated and now reappear in secdef
+    to_reactivate = sorted(today_secdef & inactive_instruments)
+
     # Safety guard: refuse to deactivate when secdef snapshot is incomplete
     if len(today_secdef) < MIN_SECDEF_COUNT:
         logger.warning(
@@ -82,22 +94,10 @@ def detect_instrument_changes(today: date) -> dict:
             "Skipping deactivation to prevent false mass-deactivation.",
             len(today_secdef), MIN_SECDEF_COUNT,
         )
-        return {
-            "today":         today.isoformat(),
-            "first_run":     False,
-            "new_symbols":   [],   # also skip new symbol fetch -- data unreliable
-            "to_reactivate": [],
-            "to_deactivate": [],
-        }
-
-    # Symbols in secdef but completely absent from instrument_master (never seen before)
-    new_symbols = sorted(today_secdef - all_instruments)
-
-    # Symbols that were previously deactivated and now reappear in secdef
-    to_reactivate = sorted(today_secdef & inactive_instruments)
-
-    # Active instruments that no longer appear in today's secdef
-    to_deactivate = sorted(active_instruments - today_secdef)
+        to_deactivate = []
+    else:
+        # Active instruments that no longer appear in today's secdef
+        to_deactivate = sorted(active_instruments - today_secdef)
 
     logger.info(
         "[DELTA] New (not in IM at all): %d | To reactivate (inactive but back in secdef): %d | To deactivate (active but missing from secdef): %d",
@@ -193,10 +193,8 @@ def _build_rows_from_secdef(symbols: list[str], today_str: str) -> list[tuple]:
      listed_date, final_trade_date, short_name, full_name, index_name, is_active)
     """
     from utils.db import get_secdef_rows_for_symbols
-    from datetime import date
 
-    today = date.fromisoformat(today_str)
-    secdef_rows = get_secdef_rows_for_symbols(symbols, today)
+    secdef_rows = get_secdef_rows_for_symbols(symbols)
 
     rows = []
     seen: set[tuple] = set()
