@@ -10,6 +10,7 @@ Handles:
 - Flush with exponential-backoff retry
 - Explicit Kafka offset commit after Delta write (at-least-once)
 - Graceful shutdown (SIGINT/SIGTERM)
+- Fetch tuning: fetch.min.bytes / fetch.wait.max.ms configurable per archiver
 """
 from __future__ import annotations
 
@@ -60,6 +61,11 @@ class DeltaLakeArchiver:
       - storage_options:     Override S3/MinIO options (default: from env)
       - partition_by:        Delta partition columns (default ["date"])
       - minio_bucket:        Bucket name to ensure exists (default "market-data")
+      - fetch_min_bytes:     kafka fetch.min.bytes — broker waits until N bytes
+                             available before responding. Archivers typically handle
+                             high-volume topics, so default is 8192 (vs 1 for consumers).
+      - fetch_wait_max_ms:   kafka fetch.wait.max.ms — max wait to satisfy
+                             fetch_min_bytes. Default 100ms for archivers.
 
     Usage:
         DeltaLakeArchiver(
@@ -86,6 +92,8 @@ class DeltaLakeArchiver:
         storage_options: dict | None = None,
         partition_by: list[str] | None = None,
         minio_bucket: str = "market-data",
+        fetch_min_bytes: int = 8192,
+        fetch_wait_max_ms: int = 100,
     ) -> None:
         self.topic = topic
         self.consumer_group = consumer_group
@@ -99,6 +107,8 @@ class DeltaLakeArchiver:
         self._storage_options = storage_options or _build_storage_options()
         self._partition_by = partition_by or ["date"]
         self._minio_bucket = minio_bucket
+        self._fetch_min_bytes = fetch_min_bytes
+        self._fetch_wait_max_ms = fetch_wait_max_ms
 
     # ── Public API ────────────────────────────────────────────────
 
@@ -134,6 +144,7 @@ class DeltaLakeArchiver:
         print(f"[START] Consumer group: {self.consumer_group}")
         print(f"[CONFIG] {self.topic} -> Delta Lake {self._delta_table_uri}")
         print(f"[CONFIG] Flush every {self._flush_interval}s or {self._flush_size} records")
+        print(f"[CONFIG] Fetch: min_bytes={self._fetch_min_bytes} wait_max_ms={self._fetch_wait_max_ms}")
 
         try:
             while running:
@@ -221,6 +232,11 @@ class DeltaLakeArchiver:
             "auto.offset.reset":  "earliest",
             "value.deserializer": avro_deserializer,
             "enable.auto.commit": False,
+            # ── Fetch tuning ──────────────────────────────────────────────────
+            # Archivers flush every 300s/5000 records, so server-side batching
+            # is safe. Higher fetch.min.bytes reduces round-trips and broker CPU.
+            "fetch.min.bytes":    self._fetch_min_bytes,
+            "fetch.wait.max.ms":  self._fetch_wait_max_ms,
         })
 
     def _flush(self, consumer: DeserializingConsumer, buffer: list, last_msg: Message) -> int:
@@ -238,7 +254,7 @@ class DeltaLakeArchiver:
             schema_mode="merge",
         )
         # Commit AFTER Delta write — ensures at-least-once delivery
-        consumer.commit(message=last_msg)
+        consumer.commit(message=last_msg, asynchronous=True)
 
         n = len(buffer)
         date_val = buffer[0].get("date", "?")

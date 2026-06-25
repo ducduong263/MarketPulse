@@ -17,10 +17,11 @@ create table if not exists market_trade (
     session_open    double precision,            -- open_price phiên
     session_vwap    double precision,            -- avg_price phiên (VWAP từ sàn)
 
-    exchange_ts      timestamptz     not null,   -- sending_time: nguồn gốc từ sàn
-    dnse_ts         timestamptz,                -- multicast_receive_time: đo latency
-    producer_ts     timestamptz,                -- _receivedAt: thời điểm Python SDK decode được message
+    exchange_ts      timestamptz     not null,   -- sending_time: origin from exchange
+    dnse_ts         timestamptz,                -- multicast_receive_time: latency measurement
+    producer_ts     timestamptz,                -- _receivedAt: timestamp when Python SDK decoded the message
     ingested_ts     timestamptz     default clock_timestamp()
+    is_backfill     boolean         not null default false
 );
 
 select create_hypertable('market_trade', 'exchange_ts',
@@ -33,7 +34,7 @@ create index if not exists idx_trade_symbol_side_ts
     on market_trade (symbol, side, exchange_ts desc);
 
 -- ============================================================
--- Bảng order_book_l2 (quote)
+-- order_book_l2 (quote)
 -- ============================================================
 create table if not exists order_book_l2 (
     symbol          text            not null,
@@ -53,7 +54,8 @@ create table if not exists order_book_l2 (
     exchange_ts     timestamptz     not null,
     dnse_ts         timestamptz,
     producer_ts     timestamptz,
-    ingested_ts     timestamptz     default clock_timestamp()
+    ingested_ts     timestamptz     default clock_timestamp(),
+    is_backfill     boolean         not null default false
 );
 
 select create_hypertable('order_book_l2', 'exchange_ts',
@@ -63,7 +65,7 @@ create index if not exists idx_ob_symbol_ts
     on order_book_l2 (symbol, exchange_ts desc);
 
 -- ============================================================
--- Bảng news_sentiment
+-- news_sentiment table
 -- ============================================================
 create table if not exists news_sentiment (
     id              serial,
@@ -87,7 +89,7 @@ create index if not exists idx_sentiment_symbol_ts
     on news_sentiment (symbol, published_ts desc);
 
 -- ============================================================
--- Bảng security_definition (Giá trần sàn, tham chiếu)
+-- security_definition table (ceiling/floor/reference prices)
 -- ============================================================
 create table if not exists security_definition (
     symbol                      text            not null,
@@ -120,17 +122,17 @@ create table if not exists security_definition (
 
 
 -- ============================================================
--- Bảng expected_price (Giá dự kiến khớp ATO/ATC)
--- Dữ liệu Periodic, chỉ xuất hiện trong phiên ATO/ATC
+-- expected_price (ATO/ATC expected match price)
+-- Periodic data, only appears during ATO/ATC session
 -- ============================================================
 create table if not exists expected_price (
     symbol          text            not null,
     market_id       text,
     board_id        text,
     isin            text,
-    close_price     double precision,   -- Giá tham chiếu (phiên trước)
-    expected_price  double precision,   -- Giá dự kiến khớp
-    expected_qty    bigint,             -- KL dự kiến khớp
+    close_price     double precision,   -- Reference price (previous session)
+    expected_price  double precision,   -- Expected match price
+    expected_qty    bigint,             -- Expected match quantity
     producer_ts     timestamptz     not null,
     ingested_ts     timestamptz     default clock_timestamp()
 );
@@ -142,46 +144,46 @@ create index if not exists idx_exprice_symbol_ts
     on expected_price (symbol, producer_ts desc);
 
 -- ============================================================
--- Bảng market_index (Chỉ số thị trường: VNINDEX, VN30, HNX...)
--- Dữ liệu Periodic, cập nhật mỗi 5 giây trong phiên giao dịch
+-- market_index (Market index: VNINDEX, VN30, HNX...)
+-- Periodic data, updated every 5 seconds during trading session
 -- ============================================================
 create table if not exists market_index (
-    index_name          text            not null,   -- VD: VNINDEX, VN30, HNX
+    index_name          text            not null,   -- e.g. VNINDEX, VN30, HNX
     market_id           text,                       -- STO (HOSE), STX (HNX), UPX (UPCOM)
 
-    -- Giá trị chỉ số
-    value               double precision,           -- Giá trị hiện tại
-    prior_value         double precision,           -- Giá trị tham chiếu
-    highest_value       double precision,           -- Cao nhất phiên
-    lowest_value        double precision,           -- Thấp nhất phiên
-    changed_value       double precision,           -- Thay đổi so với tham chiếu
-    changed_ratio       double precision,           -- % thay đổi
+    -- Index values
+    value               double precision,           -- Current value
+    prior_value         double precision,           -- Reference value
+    highest_value       double precision,           -- Session high
+    lowest_value        double precision,           -- Session low
+    changed_value       double precision,           -- Change compared to reference
+    changed_ratio       double precision,           -- % change
 
-    -- Độ rộng thị trường (Market Breadth)
-    up_count            integer,                    -- Số mã tăng
-    down_count          integer,                    -- Số mã giảm
-    steady_count        integer,                    -- Số mã không đổi
-    upper_limit_count   integer,                    -- Số mã tăng trần
-    lower_limit_count   integer,                    -- Số mã giảm sàn
+    -- Market Breadth
+    up_count            integer,                    -- Number of advancing stocks
+    down_count          integer,                    -- Number of declining stocks
+    steady_count        integer,                    -- Number of unchanged stocks
+    upper_limit_count   integer,                    -- Number of ceiling stocks
+    lower_limit_count   integer,                    -- Number of floor stocks
 
-    -- Khối lượng theo chiều
+    -- Volume by direction
     up_volume           bigint,
     down_volume         bigint,
     steady_volume       bigint,
 
-    -- Thanh khoản tổng hợp
-    total_volume        bigint,                     -- Tổng KL toàn phiên
-    total_value         double precision,           -- Tổng GT toàn phiên (tỷ đồng)
-    match_volume        bigint,                     -- KL khớp lệnh
-    match_value         double precision,           -- GT khớp lệnh
-    deal_volume         bigint,                     -- KL thỏa thuận
-    deal_value          double precision,           -- GT thỏa thuận
+    -- Aggregate liquidity
+    total_volume        bigint,                     -- Total volume of session
+    total_value         double precision,           -- Total value of session (billion VND)
+    match_volume        bigint,                     -- Match volume
+    match_value         double precision,           -- Match value
+    deal_volume         bigint,                     -- Deal volume
+    deal_value          double precision,           -- Deal value
 
     trading_session_id  text,
 
-    exchange_ts         timestamptz     not null,   -- transactTime từ sàn
-    dnse_ts             timestamptz,                -- multicastReceiveTime từ DNSE server
-    producer_ts         timestamptz,                -- _receivedAt: thời điểm Python SDK decode được message
+    exchange_ts         timestamptz     not null,   -- transactTime from exchange
+    dnse_ts             timestamptz,                -- multicastReceiveTime from DNSE server
+    producer_ts         timestamptz,                -- _receivedAt: timestamp when Python SDK decoded the message
     ingested_ts         timestamptz     default clock_timestamp()
 );
 
@@ -195,8 +197,8 @@ create index if not exists idx_market_index_name_ts
 
 
 -- ============================================================
--- Bảng foreign_investor (Giao dịch nhà đầu tư nước ngoài)
--- Cập nhật liên tục trong phiên, mỗi lần có GD nước ngoài
+-- foreign_investor (Foreign investor transactions)
+-- Updated continuously during the session for each foreign transaction
 -- ============================================================
 create table if not exists foreign_investor (
     symbol              text            not null,
@@ -204,23 +206,23 @@ create table if not exists foreign_investor (
     board_id            text,
     trading_session_id  text,
 
-    sell_volume         bigint,         -- KL bán trong lần cập nhật này
-    sell_value          bigint,         -- GT bán (VND)
-    buy_volume          bigint,         -- KL mua
-    buy_value           bigint,         -- GT mua (VND)
+    sell_volume         bigint,         -- Sell volume in this update
+    sell_value          bigint,         -- Sell value (VND)
+    buy_volume          bigint,         -- Buy volume
+    buy_value           bigint,         -- Buy value (VND)
 
-    -- Dữ liệu lũy kế cả phiên
+    -- Accumulated values for the entire session
     total_sell_volume   bigint,
     total_sell_value    bigint,
     total_buy_volume    bigint,
     total_buy_value     bigint,
 
-    -- Thông tin room nước ngoài
-    order_limit_qty     bigint,         -- Room tổng (foreignerOrderLimitQuantity)
-    buy_possible_qty    bigint,         -- Room còn lại (foreignerBuyPossibleQuantity)
+    -- Foreign limits information
+    order_limit_qty     bigint,         -- Foreigner order limit quantity
+    buy_possible_qty    bigint,         -- Foreigner buy possible quantity
 
-    exchange_ts         timestamptz,    -- transactTime (nullable, format chưa xác định)
-    producer_ts         timestamptz not null,   -- _receivedAt (luôn có)
+    exchange_ts         timestamptz,    -- transactTime (nullable, format undefined)
+    producer_ts         timestamptz not null,   -- _receivedAt (always present)
     ingested_ts         timestamptz     default clock_timestamp()
 );
 
@@ -232,15 +234,15 @@ create index if not exists idx_fi_symbol_ts
 
 
 -- ============================================================
--- Bảng trading_calendar (Lịch ngày giao dịch — lấy từ DNSE REST API)
--- Ngày nằm trong bảng = ngày giao dịch. Sync bởi dag_sync_calendar.
+-- trading_calendar (Trading calendar — fetched from DNSE REST API)
+-- Dates in this table = trading days. Synchronized by dag_sync_calendar.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS trading_calendar (
     trading_date  date  PRIMARY KEY
 );
 
 -- ============================================================
--- Bảng instrument_master (Danh mục mã chứng khoán)
+-- instrument_master (Security master list)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS instrument_master (
     symbol              text        NOT NULL,

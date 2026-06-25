@@ -10,6 +10,7 @@ Handles:
 - Graceful shutdown (SIGINT/SIGTERM)
 - Optional board_id filtering (ALLOWED_BOARDS)
 - StatsReporter: periodic flush of health metrics to pipeline_stats table
+- Fetch tuning: fetch.min.bytes / fetch.wait.max.ms configurable per consumer
 """
 from __future__ import annotations
 
@@ -34,14 +35,22 @@ class KafkaTimescaleConsumer:
     Reusable Kafka Avro -> TimescaleDB batch consumer.
 
     Each concrete consumer provides:
-      - topic:             Kafka topic name
-      - consumer_group:    Consumer group ID
-      - schema_path:       Path to .avsc schema file
-      - insert_sql:        SQL with VALUES %s placeholder
-      - record_to_row_fn:  Function (record: dict) -> tuple for DB insert
-      - batch_size:        Flush when batch reaches this size (default 100)
-      - batch_timeout:     Flush when batch age exceeds this (seconds, default 2.0)
-      - allowed_boards:    Optional set of board_id strings to allow (None = no filter)
+      - topic:              Kafka topic name
+      - consumer_group:     Consumer group ID
+      - schema_path:        Path to .avsc schema file
+      - insert_sql:         SQL with VALUES %s placeholder
+      - record_to_row_fn:   Function (record: dict) -> tuple for DB insert
+      - batch_size:         Flush when batch reaches this size (default 100)
+      - batch_timeout:      Flush when batch age exceeds this (seconds, default 2.0)
+      - allowed_boards:     Optional set of board_id strings to allow (None = no filter)
+      - fetch_min_bytes:    kafka fetch.min.bytes — wait until broker has at least N bytes
+                            before sending a fetch response. Higher = fewer round-trips,
+                            more latency. Default 1 (confluent-kafka default, no batching).
+                            Recommended 8192 for high-volume topics (e.g. quote, archive).
+      - fetch_wait_max_ms:  kafka fetch.wait.max.ms — max time broker waits to fill
+                            fetch_min_bytes. Default 500ms. Lower = more responsive,
+                            higher = better CPU efficiency.
+                            Recommended 100ms paired with fetch_min_bytes=8192.
 
     Usage:
         KafkaTimescaleConsumer(
@@ -53,6 +62,9 @@ class KafkaTimescaleConsumer:
             batch_size=100,
             batch_timeout=2.0,
             allowed_boards={"G1"},
+            # High-volume topic tuning:
+            fetch_min_bytes=8192,
+            fetch_wait_max_ms=100,
         ).run()
     """
 
@@ -67,6 +79,8 @@ class KafkaTimescaleConsumer:
         batch_timeout: float = 2.0,
         allowed_boards: set | None = None,
         service_name: str | None = None,
+        fetch_min_bytes: int = 1,
+        fetch_wait_max_ms: int = 500,
     ) -> None:
         self.topic = topic
         self.consumer_group = consumer_group
@@ -76,8 +90,10 @@ class KafkaTimescaleConsumer:
         self._batch_size = batch_size
         self._batch_timeout = batch_timeout
         self._allowed_boards = allowed_boards  # None means accept all boards
+        self._fetch_min_bytes = fetch_min_bytes
+        self._fetch_wait_max_ms = fetch_wait_max_ms
 
-        # ── Stats reporter ─────────────────────────────────────────
+        # ── Stats reporter ────────────────────────────────────────────────────
         _svc = service_name or self.__class__.__name__.lower()
         self._stats = StatsReporter(service_name=_svc)
 
@@ -121,6 +137,7 @@ class KafkaTimescaleConsumer:
 
         print(f"[START] Consumer group: {self.consumer_group}")
         print(f"[CONFIG] Topic: {self.topic} | Batch: {self._batch_size} | Timeout: {self._batch_timeout}s")
+        print(f"[CONFIG] Fetch: min_bytes={self._fetch_min_bytes} wait_max_ms={self._fetch_wait_max_ms}")
         if self._allowed_boards:
             print(f"[CONFIG] Board filter: {self._allowed_boards}")
 
@@ -174,12 +191,14 @@ class KafkaTimescaleConsumer:
                     last_skip_commit = now     # _flush_batch already calls commit()
                     skipped_since_commit = 0
 
-                # ── Periodic commit for skipped (filtered) messages ─
+                # ── Periodic commit for skipped (filtered) messages ──────────
                 # Ensures non-G1 messages don't accumulate as permanent
-                # consumer lag when the batch never fills (e.g. end of day)
+                # consumer lag when the batch never fills (e.g. end of day).
+                # asynchronous=True: safe here since no DB write is involved —
+                # worst case on failure we re-filter the same messages on restart.
                 elif skipped_since_commit > 0 and now - last_skip_commit >= 5:
                     try:
-                        consumer.commit()
+                        consumer.commit(asynchronous=True)
                         last_skip_commit = now
                         skipped_since_commit = 0
                     except Exception:
@@ -233,6 +252,13 @@ class KafkaTimescaleConsumer:
             "auto.offset.reset":  "earliest",
             "value.deserializer": avro_deserializer,
             "enable.auto.commit": False,
+            # ── Fetch tuning ────────────────────────────────────────────────────
+            # fetch.min.bytes: broker waits until it has this many bytes before
+            # sending a response. Higher value = fewer round-trips, lower CPU.
+            # fetch.wait.max.ms: max broker wait time to satisfy fetch.min.bytes.
+            # Together they act as a server-side batching knob.
+            "fetch.min.bytes":    self._fetch_min_bytes,
+            "fetch.wait.max.ms":  self._fetch_wait_max_ms,
         })
 
     def _create_db_conn(self):
@@ -263,7 +289,7 @@ class KafkaTimescaleConsumer:
                     page_size=len(batch),
                 )
             conn.commit()
-            consumer.commit()
+            consumer.commit(asynchronous=True)
             print(f"[FLUSH] +{len(batch)} rows | total: {total_rows + len(batch)}")
         except Exception as e:
             conn.rollback()

@@ -63,18 +63,35 @@ def dag_eod_archive():
         )
 
     @task()
-    def log_summary(n_fi: int, n_index: int) -> None:
+    def archive_ohlc_rest_api(is_trading: bool) -> dict:
+        import sys
+        from pathlib import Path
+        possible_roots = [
+            Path(__file__).resolve().parents[2],  # Host path
+            Path("/opt/airflow"),                  # Container path
+        ]
+        for root in possible_roots:
+            if root.exists() and str(root) not in sys.path:
+                sys.path.insert(0, str(root))
+
+        from ingestion.handlers.backfill_ohlc import run_eod_ohlc
+        # Run EOD OHLC (defaults to today and resolutions ["1", "1D"])
+        return run_eod_ohlc()
+
+    @task()
+    def log_summary(n_fi: int, n_index: int, ohlc_stats: dict) -> None:
         today_str = (datetime.now(timezone.utc) + timedelta(hours=7)).date().isoformat()
         logger.info(
-            "[EOD ARCHIVE DONE] %s: foreign_investor=%d rows, market_index=%d rows",
-            today_str, n_fi, n_index,
+            "[EOD ARCHIVE DONE] %s: foreign_investor=%d rows, market_index=%d rows, ohlc_resolutions=%s",
+            today_str, n_fi, n_index, list(ohlc_stats.keys()) if ohlc_stats else [],
         )
 
     # ── DAG wiring ────────────────────────────────────────────────
     is_trading = check_trading_day()
     n_fi    = archive_foreign_investor(is_trading)
     n_index = archive_market_index(is_trading)
-    log_summary(n_fi, n_index)
+    ohlc_stats = archive_ohlc_rest_api(is_trading)
+    log_summary(n_fi, n_index, ohlc_stats)
 
 
 dag_eod_archive()

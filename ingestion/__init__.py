@@ -3,6 +3,7 @@ from .common.gap_detector import GapDetector
 from .common.producer_base import DnseKafkaProducer
 from .common.consumer_base import KafkaTimescaleConsumer
 from .common.archiver_base import DeltaLakeArchiver
+from .common.checkpoint import CheckpointManager
 
 __all__ = [
     "unwrap_union",
@@ -12,4 +13,5 @@ __all__ = [
     "DnseKafkaProducer",
     "KafkaTimescaleConsumer",
     "DeltaLakeArchiver",
+    "CheckpointManager",
 ]
