@@ -341,10 +341,17 @@ def ingest_ohlc_chunk(
         if not overwrite:
             try:
                 dt = DeltaTable(DELTA_TABLE_URI, storage_options=storage_options)
+                chunk_start_date = (chunk_start + timedelta(hours=7)).date().isoformat()
+                chunk_end_date   = (chunk_end   + timedelta(hours=7)).date().isoformat()
                 existing_table = dt.to_pyarrow_table(
+                    columns=["time"],
                     partitions=[
-                        ("symbol", "=", symbol),
-                        ("resolution", "=", norm_res)
+                        ("symbol",     "=", symbol),
+                        ("resolution", "=", norm_res),
+                    ],
+                    filters=[
+                        ("date", ">=", chunk_start_date),
+                        ("date", "<=", chunk_end_date),
                     ]
                 )
                 existing_times = set(existing_table.column("time").to_pylist())
