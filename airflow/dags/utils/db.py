@@ -11,7 +11,8 @@ Provides:
 - get_all_instrument_symbols()                   : set of all symbols in instrument_master (any is_active)
 - get_active_instrument_symbols()                : set of symbols where is_active=True
 - get_inactive_instrument_symbols()              : set of symbols where is_active=False
-- get_active_instrument_symbols_by_market(mkt)  : set of active symbols filtered by market_id
+- get_active_instrument_symbols_by_market(mkt)   : set of active symbols filtered by single market_id
+- get_active_instrument_symbols_by_markets(mkts)  : set of active symbols filtered by multiple market_ids
 - get_secdef_rows_for_symbols(syms, date)        : raw secdef rows for fallback upsert
 - deactivate_instruments(symbols)               : mark symbols as is_active = false
 - reactivate_instruments(symbols)               : mark symbols as is_active = true
@@ -327,6 +328,37 @@ def get_active_instrument_symbols_by_market(market_id: str) -> set[str]:
             rows = cur.fetchall()
     symbols = {r[0] for r in rows}
     logger.info("[IM] %d active symbols in instrument_master for market=%s", len(symbols), market_id)
+    return symbols
+
+
+def get_active_instrument_symbols_by_markets(market_ids: frozenset | set) -> set[str]:
+    """
+    Return the set of active symbols in instrument_master for a collection of market_ids.
+    Used by detect_instrument_changes to scope deactivation to STO/STX/DVX only,
+    excluding UPCOM (UPX) and HCX whose secdef data arrives late via REST API.
+
+    Args:
+        market_ids: Collection of market identifiers, e.g. frozenset({'STO', 'STX', 'DVX'}).
+
+    Returns:
+        Set of symbol strings where is_active = True and market_id in market_ids.
+    """
+    if not market_ids:
+        return set()
+    placeholders = ",".join(["%s"] * len(market_ids))
+    with get_db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"SELECT DISTINCT symbol FROM instrument_master "
+                f"WHERE is_active = true AND market_id IN ({placeholders})",
+                list(market_ids),
+            )
+            rows = cur.fetchall()
+    symbols = {r[0] for r in rows}
+    logger.info(
+        "[IM] %d active symbols in instrument_master for markets=%s",
+        len(symbols), sorted(market_ids),
+    )
     return symbols
 
 

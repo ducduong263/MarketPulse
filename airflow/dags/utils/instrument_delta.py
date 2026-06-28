@@ -2,8 +2,9 @@
 utils/instrument_delta.py — Business logic for dag_instrument_delta.
 
 Logic:
-  Compare instrument_master (is_active=True) vs today's security_definition.
-  This is the single source of truth — no need to compare two days.
+  Compare instrument_master vs today's security_definition.
+  Deactivation scope: only applies to STO (HOSE), STX (HNX), DVX (Derivatives) markets.
+  UPCOM (UPX) and HCX are excluded from deactivation because their data arrives late (REST API ~09:15 ICT).
 
 Provides:
 - detect_instrument_changes(today)         : diff instrument_master vs secdef today
@@ -11,6 +12,7 @@ Provides:
                                              (fallback: upsert from secdef data if API misses any)
 - reactivate_returned_instruments(changes) : reactivate symbols that were inactive and reappear
 - deactivate_gone_instruments(changes)     : mark inactive symbols vs secdef today
+                                             (only for STO/STX/DVX)
 - refresh_dvx_metadata()                   : re-fetch ALL active DVX symbols from DNSE API
                                              to capture symbol_type / short_name changes
                                              after a futures roll (secdef does not track this)
@@ -24,40 +26,46 @@ from datetime import date
 
 logger = logging.getLogger(__name__)
 
+# Only apply deactivation to these markets.
+# UPCOM (UPX) and HCX are excluded because their data arrives late (~09:15 ICT via REST API)
+# and should not be falsely deactivated in the morning.
+DEACTIVATION_MARKETS = frozenset({"STO", "STX", "DVX"})
 
 def detect_instrument_changes(today: date) -> dict:
     """
-    Compare active instrument_master symbols vs security_definition for today.
+    Compare instrument_master symbols vs security_definition for today.
 
     Logic:
       - new_symbols   : in secdef today but NOT in instrument_master (any is_active)
       - to_reactivate : in secdef today AND in instrument_master with is_active=False
                         (symbol disappeared previously, now relisted/unsuspended)
-      - to_deactivate : in instrument_master (is_active=True) but NOT in secdef today
+      - to_deactivate : in instrument_master (is_active=True, market in STO/STX/DVX)
+                        but NOT in today's secdef.
+                        UPCOM (UPX) and HCX are excluded from deactivation because of late arrival.
 
     Returns a dict with:
       - today:          ISO date string
       - first_run:      True if instrument_master is empty
       - new_symbols:    symbols to fetch/upsert from API
       - to_reactivate:  symbols to set is_active=True (returned after deactivation)
-      - to_deactivate:  symbols to set is_active=False
+      - to_deactivate:  symbols to set is_active=False (STO/STX/DVX only)
     """
     from utils.db import (
         get_secdef_symbols,
         get_active_instrument_symbols,
+        get_active_instrument_symbols_by_markets,
         get_all_instrument_symbols,
         get_inactive_instrument_symbols,
         get_symbols_missing_from_instrument_master,
     )
 
     # Minimum number of symbols expected in a valid secdef snapshot.
-    # HOSE alone lists ~400 stocks; a full snapshot (HOSE+HNX+UPCOM+derivatives) has ~3000.
-    # If we get less than this, the sync ran outside market hours or failed silently.
+    # STO+STX+DVX alone = ~1,871 symbols. If we get less, WSS likely failed.
     MIN_SECDEF_COUNT = 200
 
-    today_secdef       = get_secdef_symbols(today)
-    all_instruments    = get_all_instrument_symbols()     # all rows, regardless of is_active
-    active_instruments = get_active_instrument_symbols()  # only is_active=True
+    today_secdef         = get_secdef_symbols(today)
+    all_instruments      = get_all_instrument_symbols()     # all rows, regardless of is_active
+    active_instruments   = get_active_instrument_symbols()  # only is_active=True
     inactive_instruments = get_inactive_instrument_symbols()  # only is_active=False
 
     if not all_instruments:
@@ -96,8 +104,14 @@ def detect_instrument_changes(today: date) -> dict:
         )
         to_deactivate = []
     else:
-        # Active instruments that no longer appear in today's secdef
-        to_deactivate = sorted(active_instruments - today_secdef)
+        # Only deactivate symbols belonging to STO/STX/DVX that no longer appear in today's secdef.
+        # UPCOM (UPX) and HCX are excluded because their data arrives late via REST API (~09:15 ICT).
+        active_priority = get_active_instrument_symbols_by_markets(DEACTIVATION_MARKETS)
+        to_deactivate = sorted(active_priority - today_secdef)
+        logger.info(
+            "[DELTA] Deactivation scope: %s only | Active in scope: %d | Missing from secdef: %d",
+            "/".join(sorted(DEACTIVATION_MARKETS)), len(active_priority), len(to_deactivate),
+        )
 
     logger.info(
         "[DELTA] New (not in IM at all): %d | To reactivate (inactive but back in secdef): %d | To deactivate (active but missing from secdef): %d",
@@ -117,6 +131,7 @@ def detect_instrument_changes(today: date) -> dict:
         "to_reactivate":  to_reactivate,
         "to_deactivate":  to_deactivate,
     }
+
 
 
 def upsert_new_instruments(changes: dict) -> int:

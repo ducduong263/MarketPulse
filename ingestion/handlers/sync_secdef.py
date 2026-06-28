@@ -41,7 +41,12 @@ DB_NAME     = os.getenv("postgres_db", "market_data")
 DB_USER     = os.getenv("postgres_user", "marketpulse")
 DB_PASSWORD = os.getenv("postgres_password", "mp_secret_2026")
 
-FLUSH_INTERVAL = 10.0 
+FLUSH_INTERVAL = 10.0
+
+# Priority group to subscribe via WSS (HOSE + HNX + Derivatives)
+# UPCOM (UPX) and HCX will be fetched via REST API in export_secdef.py
+WSS_PRIORITY_MARKETS = ("STO", "STX", "DVX")
+WSS_MAX_SYMBOLS = 1950  # Hard limit: 2000 channels; keep 50 buffer to prevent errors
 
 # ── SQL ───────────────────────────────────────────────────────────
 UPSERT_SQL = """
@@ -126,8 +131,33 @@ def _create_db_conn():
     )
 
 
+def _get_priority_symbols(conn) -> list[str]:
+    """
+    Get the list of priority symbols from instrument_master:
+    - STO (HOSE), STX (HNX), DVX (Derivatives) markets
+    - Not expired yet: final_trade_date >= today OR NULL
+    - Limited by WSS_MAX_SYMBOLS to prevent MAX_CHANNELS_EXCEEDED errors
+    """
+    markets_ph = ",".join(["%s"] * len(WSS_PRIORITY_MARKETS))
+    sql = f"""
+        SELECT DISTINCT symbol
+        FROM instrument_master
+        WHERE market_id IN ({markets_ph})
+          AND (final_trade_date >= CURRENT_DATE OR final_trade_date IS NULL)
+        ORDER BY symbol
+        LIMIT %s;
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, list(WSS_PRIORITY_MARKETS) + [WSS_MAX_SYMBOLS])
+        rows = cur.fetchall()
+    symbols = [row[0] for row in rows]
+    print(f"[DB] Loaded {len(symbols)} priority symbols from instrument_master "
+          f"(markets: {', '.join(WSS_PRIORITY_MARKETS)})")
+    return symbols
+
+
 def _flush(conn, pending: dict, stats: dict) -> None:
-    """Upsert tat ca records dang pending vao DB."""
+    """Upsert all pending records into DB."""
     if not pending:
         return
     rows = list(pending.values())
@@ -182,16 +212,30 @@ async def main(timeout: int | None):
     print(f"[START] SecDef Sync -> PostgreSQL ({DB_HOST}:{DB_PORT}/{DB_NAME})")
     print(f"[CONFIG] Timeout: {'indefinite' if timeout is None else f'{timeout}s'} | Flush every: {FLUSH_INTERVAL}s")
 
+    # Load the priority symbols from the DB
+    priority_symbols = _get_priority_symbols(conn)
+    if not priority_symbols:
+        print("[ERROR] No priority symbols found in instrument_master. "
+              "Run dag_instrument_delta (first run) before this script.")
+        conn.close()
+        return
+
     await client.connect()
     print("[SUCCESS] Connected to DNSE WebSocket!")
 
-    await client.subscribe_sec_def(
-        symbols=[""], # change from "*" to ""
-        on_sec_def=handle_secdef,
-        encoding="msgpack",
-        board_id="G1",
-    )
-    print("[SUBSCRIBED] Listening for SecurityDefinition on all boards...")
+    # Subscribe in batches to prevent MAX_CHANNELS_EXCEEDED server error
+    BATCH_SIZE = 300
+    for i in range(0, len(priority_symbols), BATCH_SIZE):
+        batch = priority_symbols[i : i + BATCH_SIZE]
+        await client.subscribe_sec_def(
+            symbols=batch,
+            on_sec_def=handle_secdef,
+            encoding="msgpack",
+            board_id="G1",
+        )
+        print(f"[SUBSCRIBED] Batch {i // BATCH_SIZE + 1}: {len(batch)} symbols "
+              f"(total so far: {min(i + BATCH_SIZE, len(priority_symbols))}/{len(priority_symbols)})")
+    print(f"[SUBSCRIBED] Done subscribing {len(priority_symbols)} priority symbols. Listening...")
 
     deadline = (time.monotonic() + timeout) if timeout else None
 
@@ -201,13 +245,13 @@ async def main(timeout: int | None):
 
             now = time.monotonic()
 
-            # Flush theo interval
+            # Flush periodically
             if pending and (now - last_flush) >= FLUSH_INTERVAL:
                 _flush(conn, pending, stats)
                 pending.clear()
                 last_flush = now
 
-            # Kiem tra timeout
+            # Check timeout
             if deadline and now >= deadline:
                 print(f"[TIMEOUT] {timeout}s elapsed, stopping.")
                 break

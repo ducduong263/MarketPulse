@@ -14,6 +14,8 @@ Tasks:
 from __future__ import annotations
 
 from airflow.sdk import dag, task
+from airflow.exceptions import AirflowSkipException
+
 
 
 @dag(
@@ -35,7 +37,7 @@ def dag_cleanup_timescaledb():
         result = is_trading_day(today)
         logging.getLogger(__name__).info("[CHECK] %s is_trading_day=%s", today, result)
         if not result:
-            raise Exception(f"Skipping: {today} is not a trading day")
+            raise AirflowSkipException(f"Skipping: {today} is not a trading day")
         return result
 
     @task()

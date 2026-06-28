@@ -21,6 +21,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 
 from airflow.sdk import dag, task
+from airflow.exceptions import AirflowSkipException
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ def dag_compact_bronze():
         result = is_trading_day(today)
         logger.info("[CHECK] %s is_trading_day=%s", today, result)
         if not result:
-            raise Exception(f"Skipping: {today} is not a trading day")
+            raise AirflowSkipException(f"Skipping: {today} is not a trading day")
         return result
 
     @task()

@@ -347,7 +347,54 @@ def run_sync_secdef(script_path: str, timeout: int) -> int:
     return upserted
 
 
+def run_export_secdef(script_path: str) -> int:
+    """
+    Run export_secdef.py as a subprocess (REST API fallback for UPCOM/HCX).
+
+    Args:
+        script_path: Absolute path to export_secdef.py inside the container.
+
+    Returns:
+        Number of symbols successfully fetched (parsed from stdout).
+
+    Raises:
+        RuntimeError: If process exits with non-zero return code.
+    """
+    import subprocess
+    import sys as _sys
+
+    cmd = [_sys.executable, script_path]
+    logger.info("Running export_secdef (REST API fallback): %s", " ".join(cmd))
+
+    result = subprocess.run(
+        cmd, capture_output=True, text=True, timeout=7200  # max 2h for ~1100 symbols @ 3.8s each
+    )
+
+    for line in result.stdout.splitlines():
+        logger.info("[export_secdef] %s", line)
+    for line in result.stderr.splitlines():
+        logger.warning("[export_secdef stderr] %s", line)
+
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"export_secdef.py failed with exit code {result.returncode}"
+        )
+
+    success_count = 0
+    for line in result.stdout.splitlines():
+        if "Success:" in line:
+            try:
+                # "[DONE] Total: X symbols | Success: Y | Failed: Z"
+                success_count = int(line.split("Success:")[-1].split("|")[0].strip())
+            except ValueError:
+                pass
+
+    logger.info("[export_secdef] Fetched %d symbols via REST API", success_count)
+    return success_count
+
+
 def trigger_dag(dag_id: str) -> None:
+
     """
     Trigger another DAG via TriggerDagRunOperator.
 
