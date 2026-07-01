@@ -58,6 +58,7 @@ x-airflow-common: &airflow-common
     - ./airflow/requirements.txt:/opt/airflow/requirements.txt:ro
     # MarketPulse scripts & schemas accessible inside Airflow containers
     - ./ingestion:/opt/airflow/ingestion
+    - ./transform:/opt/airflow/transform
     - ./schemas:/opt/airflow/schemas
     - ./sdk:/opt/airflow/sdk
   user: "${AIRFLOW_UID:-50000}:0"

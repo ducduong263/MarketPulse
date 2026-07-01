@@ -17,6 +17,7 @@ from datetime import datetime, timezone, timedelta
 
 from airflow.sdk import dag, task
 from airflow.exceptions import AirflowSkipException
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 
 logger = logging.getLogger(__name__)
 
@@ -88,11 +89,22 @@ def dag_eod_archive():
         )
 
     # ── DAG wiring ────────────────────────────────────────────────
-    is_trading = check_trading_day()
-    n_fi    = archive_foreign_investor(is_trading)
-    n_index = archive_market_index(is_trading)
-    ohlc_stats = archive_ohlc_rest_api(is_trading)
-    log_summary(n_fi, n_index, ohlc_stats)
+    is_trading  = check_trading_day()
+    n_fi        = archive_foreign_investor(is_trading)
+    n_index     = archive_market_index(is_trading)
+    ohlc_stats  = archive_ohlc_rest_api(is_trading)
+    summary     = log_summary(n_fi, n_index, ohlc_stats)
+
+    # Trigger Silver transform after EOD Bronze is complete
+    today_str = (datetime.now(timezone.utc) + timedelta(hours=7)).date().isoformat()
+    trigger_silver = TriggerDagRunOperator(
+        task_id="trigger_silver_ohlc",
+        trigger_dag_id="dag_silver_ohlc",
+        conf={"date": today_str},
+        wait_for_completion=False,
+        reset_dag_run=True,
+    )
+    summary >> trigger_silver
 
 
 dag_eod_archive()

@@ -1,0 +1,11 @@
+{
+    "pythonVersion": "3.12",
+    "venvPath": ".",
+    "venv": "venv",
+    "extraPaths": [
+        "sdk/openapi-sdk/python",
+        "airflow/dags",
+        "ingestion",
+        "transform"
+    ]
+}
