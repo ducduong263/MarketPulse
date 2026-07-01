@@ -1,826 +1,1592 @@
 {
-  "annotations": { "list": [] },
-  "editable": true,
-  "graphTooltip": 1,
-  "id": null,
-  "links": [
-    { "title": "Layer 1 — Ingestion", "type": "dashboard", "url": "/d/mp-ingestion", "icon": "external link", "tooltip": "WebSocket status, reconnects, throughput", "targetBlank": false },
-    { "title": "Layer 2 — Kafka", "type": "dashboard", "url": "/d/mp-kafka", "icon": "external link", "tooltip": "Consumer lag, messages/sec, offsets", "targetBlank": false },
-    { "title": "Layer 3 — Storage", "type": "dashboard", "url": "/d/mp-storage", "icon": "external link", "tooltip": "Data freshness, latency, compression, disk", "targetBlank": false },
-    { "title": "Layer 4 — Airflow", "type": "dashboard", "url": "/d/mp-airflow", "icon": "external link", "tooltip": "DAG runs, task status", "targetBlank": false },
-    { "title": "Layer 5 — Data Quality", "type": "dashboard", "url": "/d/mp-data-quality", "icon": "external link", "tooltip": "Gap detector, price anomaly, stale data", "targetBlank": false }
-  ],
-  "refresh": "30s",
-  "schemaVersion": 39,
-  "tags": ["marketpulse", "overview"],
-  "templating": { "list": [] },
-  "time": { "from": "now-1h", "to": "now" },
-  "timepicker": {},
-  "timezone": "Asia/Ho_Chi_Minh",
-  "title": "🏠 System Overview — MarketPulse",
-  "uid": "mp-overview",
-  "version": 1,
-  "panels": [
-
-    {
-      "id": 1,
-      "type": "row",
-      "title": "⚙️ Tài nguyên hệ thống (CPU / RAM / Disk)",
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    "annotations": {
+        "list": []
     },
-
-    {
-      "id": 2,
-      "type": "gauge",
-      "title": "🖥 CPU — Tổng container",
-      "description": "Tổng % CPU (rate 2 phút) của tất cả container Docker. 100% = 1 lõi vật lý. Ngưỡng vàng = 150%, đỏ = 300%.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
+    "editable": true,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(rate(container_cpu_usage_seconds_total{name!=\"\"}[2m])) * 100",
-          "legendFormat": "CPU %",
-          "refId": "A"
+            "title": "Layer 1 — Ingestion",
+            "type": "dashboard",
+            "url": "/d/mp-ingestion",
+            "icon": "external link",
+            "tooltip": "WebSocket status, reconnects, throughput",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 2 — Kafka",
+            "type": "dashboard",
+            "url": "/d/mp-kafka",
+            "icon": "external link",
+            "tooltip": "Consumer lag, messages/sec, offsets",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 3 — Storage",
+            "type": "dashboard",
+            "url": "/d/mp-storage",
+            "icon": "external link",
+            "tooltip": "Data freshness, latency, compression, disk",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 4 — Airflow",
+            "type": "dashboard",
+            "url": "/d/mp-airflow",
+            "icon": "external link",
+            "tooltip": "DAG runs, task status",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 5 — Data Quality",
+            "type": "dashboard",
+            "url": "/d/mp-data-quality",
+            "icon": "external link",
+            "tooltip": "Gap detector, price anomaly, stale data",
+            "targetBlank": false
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 400,
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 150 },
-              { "color": "red", "value": 300 }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "orientation": "auto",
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "text": {}
-      },
-      "gridPos": { "h": 7, "w": 6, "x": 0, "y": 1 }
+    ],
+    "refresh": "30s",
+    "schemaVersion": 39,
+    "tags": [
+        "marketpulse",
+        "overview"
+    ],
+    "templating": {
+        "list": []
     },
-
-    {
-      "id": 3,
-      "type": "gauge",
-      "title": "🧠 RAM — % đã dùng / WSL2 VM",
-      "description": "RAM thực tế (Working Set) của tất cả container / Tổng RAM của WSL2 VM (8 GB). Lưu ý: 7.47 GB = tổng RAM của Docker VM, không phải RAM máy vật lý.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(container_memory_working_set_bytes{name!=\"\"}) / scalar(machine_memory_bytes) * 100",
-          "legendFormat": "RAM %",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 60 },
-              { "color": "red", "value": 85 }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "orientation": "auto",
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "text": {}
-      },
-      "gridPos": { "h": 7, "w": 6, "x": 6, "y": 1 }
+    "time": {
+        "from": "now-1h",
+        "to": "now"
     },
-
-    {
-      "id": 4,
-      "type": "stat",
-      "title": "📊 RAM chi tiết",
-      "description": "RAM Working Set đang dùng (tổng các container) vs. Tổng RAM của Docker VM (WSL2). 7.47 GB là dung lượng Docker VM, không phải RAM vật lý máy host.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
+    "timepicker": {},
+    "timezone": "Asia/Ho_Chi_Minh",
+    "title": "🏠 Tổng quan Hệ thống — MarketPulse",
+    "uid": "mp-overview",
+    "version": 1,
+    "panels": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(container_memory_working_set_bytes{name!=\"\"})",
-          "legendFormat": "Containers dùng",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "scalar(machine_memory_bytes)",
-          "legendFormat": "Docker VM total",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Containers dùng" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Docker VM total" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
-          }
-        ]
-      },
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "orientation": "vertical",
-        "graphMode": "none",
-        "colorMode": "background",
-        "textMode": "value_and_name"
-      },
-      "gridPos": { "h": 7, "w": 6, "x": 12, "y": 1 }
-    },
-
-    {
-      "id": 5,
-      "type": "stat",
-      "title": "💿 Docker Disk đã dùng (WSL2)",
-      "description": "Tổng dung lượng thực tế Docker đang chiếm trên ổ ảo WSL2 (/dev/sde). Ngưỡng vàng = 40 GB, đỏ = 70 GB.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "container_fs_usage_bytes{id=\"/\", device=\"/dev/sde\"}",
-          "legendFormat": "Disk đã dùng",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 40000000000 },
-              { "color": "red", "value": 70000000000 }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "orientation": "horizontal",
-        "graphMode": "area",
-        "colorMode": "background",
-        "textMode": "auto"
-      },
-      "gridPos": { "h": 7, "w": 6, "x": 18, "y": 1 }
-    },
-
-    {
-      "id": 6,
-      "type": "timeseries",
-      "title": "📈 CPU % theo container",
-      "description": "CPU% (rate 2 phút) từng container. Giúp phát hiện container nào đang spike bất thường.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name!=\"\"}[2m])) * 100",
-          "legendFormat": "{{name}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "color": { "mode": "palette-classic" },
-          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" }
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": { "mode": "multi", "sort": "desc" },
-        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["last", "max"] }
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
-    },
-
-    {
-      "id": 7,
-      "type": "timeseries",
-      "title": "🧠 RAM theo container",
-      "description": "Working Set Memory từng container theo thời gian. Phát hiện memory leak khi đường tăng không ngừng.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (name) (container_memory_working_set_bytes{name!=\"\"})",
-          "legendFormat": "{{name}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "color": { "mode": "palette-classic" },
-          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" }
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": { "mode": "multi", "sort": "desc" },
-        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["last", "max"] }
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
-    },
-
-    {
-      "id": 17,
-      "type": "timeseries",
-      "title": "🌐 Network I/O — Băng thông mạng (eth0)",
-      "description": "Tốc độ nhận (RX) và gửi (TX) của từng container qua interface eth0. Giúp phát hiện container nào đang chiếm nhiều băng thông nhất.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (name) (rate(container_network_receive_bytes_total{name!=\"\",interface=\"eth0\"}[2m]))",
-          "legendFormat": "RX {{name}}",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "-sum by (name) (rate(container_network_transmit_bytes_total{name!=\"\",interface=\"eth0\"}[2m]))",
-          "legendFormat": "TX {{name}}",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps",
-          "color": { "mode": "palette-classic" },
-          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" }
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": { "mode": "multi", "sort": "desc" },
-        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["last", "mean"] }
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
-    },
-
-    {
-      "id": 18,
-      "type": "timeseries",
-      "title": "💾 Disk I/O — Tốc độ đọc/ghi ổ cứng",
-      "description": "Tốc độ đọc (Read) và ghi (Write) ổ đĩa WSL2 theo từng container. Write âm theo chiều xuống để dễ phân biệt với Read.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (name) (rate(container_fs_reads_bytes_total{name!=\"\",device=\"/dev/sde\"}[2m]))",
-          "legendFormat": "Read {{name}}",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "-sum by (name) (rate(container_fs_writes_bytes_total{name!=\"\",device=\"/dev/sde\"}[2m]))",
-          "legendFormat": "Write {{name}}",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps",
-          "color": { "mode": "palette-classic" },
-          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" }
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": { "mode": "multi", "sort": "desc" },
-        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["last", "mean"] }
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 }
-    },
-
-    {
-      "id": 8,
-      "type": "row",
-      "title": "🐳 Container Health — Trạng thái tất cả container",
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 }
-    },
-
-    {
-      "id": 19,
-      "type": "stat",
-      "title": "🐳 Container Health",
-      "description": "Moi o = 1 container. Xanh=UP (<20s), Vang=WARN (20-60s), Do=DOWN (60-300s), Xam=GONE. Su dung last_over_time[6d] nen container se khong bao gio mat di trong vong 6 ngay (Prometheus retention=7d). Container chi bien mat neu da stop >6 ngay.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "time() - max by (name) (last_over_time(container_last_seen{name!=\"\"}[6d]))",
-          "legendFormat": "{{name}}",
-          "refId": "A",
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "decimals": 0,
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 20 },
-              { "color": "red", "value": 60 },
-              { "color": "#6e6e6e", "value": 300 }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "range",
-              "options": { "from": 0, "to": 19, "result": { "text": "UP", "color": "green" } }
-            },
-            {
-              "type": "range",
-              "options": { "from": 20, "to": 59, "result": { "text": "WARN", "color": "yellow" } }
-            },
-            {
-              "type": "range",
-              "options": { "from": 60, "to": 299, "result": { "text": "DOWN", "color": "red" } }
-            },
-            {
-              "type": "range",
-              "options": { "from": 300, "to": 999999, "result": { "text": "GONE", "color": "#6e6e6e" } }
+            "id": 1,
+            "type": "row",
+            "title": "⚙️ Tài nguyên hệ thống (CPU / RAM / Disk)",
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
             }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "graphMode": "none",
-        "colorMode": "background",
-        "textMode": "value_and_name",
-        "justifyMode": "center",
-        "text": {
-          "titleSize": 12,
-          "valueSize": 11
-        }
-      },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 25 }
-    },
-
-    {
-      "id": 21,
-      "type": "bargauge",
-      "title": "🔄 Container Restarts — 1 gio qua",
-      "description": "So lan container bi restart trong 1h qua, do boi changes(container_start_time_seconds). Gia tri > 0 = container dang bi crash loop hoac OOM killed va Docker tu dong khoi dong lai. Day la diem mu cua panel Container Health phia tren (van hien xanh du dang loop).",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sort_desc(changes((max by (name) (container_start_time_seconds{name!=\"\"}))[1h:30s]))",
-          "legendFormat": "{{name}}",
-          "refId": "A",
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "min": 0,
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 3 }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "orientation": "horizontal",
-        "displayMode": "gradient",
-        "showUnfilled": true,
-        "text": {}
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 }
-    },
-
-    {
-      "id": 22,
-      "type": "stat",
-      "title": "💀 OOM Kill Events",
-      "description": "Tong so lan tat ca container bi kill do het RAM. Xanh = 0 (binh thuong). Do = co container bi OOM. Neu > 0 can kiem tra ngay container nao dang bi crash do het RAM.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(container_oom_events_total{name!=\"\"})",
-          "legendFormat": "OOM Events",
-          "refId": "A",
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "noValue": "0",
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 1 }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": { "text": "OK — No OOM", "color": "green", "index": 0 }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "orientation": "auto",
-        "graphMode": "none",
-        "colorMode": "background",
-        "textMode": "value_and_name",
-        "justifyMode": "center",
-        "text": { "titleSize": 12, "valueSize": 18 }
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 }
-    },
-
-    {
-      "id": 9,
-      "type": "row",
-      "title": "🗄 TimescaleDB & Storage — Phân bổ dung lượng",
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 }
-    },
-
-    {
-      "id": 23,
-      "type": "stat",
-      "title": "🪣 MinIO Delta Lake Storage",
-      "description": "Tổng dung lượng sử dụng và số lượng objects trong bucket market-data trên MinIO.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "minio_cluster_usage_total_bytes",
-          "legendFormat": "Dung lượng đã dùng",
-          "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "minio_cluster_usage_object_total",
-          "legendFormat": "Tổng số Objects",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 21474836480 },
-              { "color": "red", "value": 53687091200 }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Tổng số Objects" },
-            "properties": [
-              { "id": "unit", "value": "short" },
-              { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Dung lượng đã dùng" },
-            "properties": [
-              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "orientation": "horizontal",
-        "graphMode": "none",
-        "colorMode": "background",
-        "textMode": "value_and_name"
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 }
-    },
-
-    {
-      "id": 10,
-      "type": "table",
-      "title": "🗄️ Chi tiết dung lượng Database",
-      "description": "Dung lượng chi tiết từng hypertable và tổng database market_data. Hàng cuối chỉ hiển thị cột Tong va MB.",
-      "datasource": { "type": "postgres", "uid": "timescaledb" },
-      "targets": [
-        {
-          "datasource": { "type": "postgres", "uid": "timescaledb" },
-          "rawSql": "SELECT hypertable_name AS \"Bang\", pg_size_pretty(table_bytes) AS \"Du lieu\", pg_size_pretty(index_bytes) AS \"Index\", pg_size_pretty(toast_bytes) AS \"TOAST\", pg_size_pretty(total_bytes) AS \"Tong\", ROUND(total_bytes / 1024.0 / 1024.0, 1) AS \"MB\" FROM timescaledb_information.hypertables CROSS JOIN LATERAL hypertable_detailed_size((hypertable_schema || '.' || hypertable_name)::regclass) UNION ALL SELECT 'DB (tong)' AS \"Bang\", NULL AS \"Du lieu\", NULL AS \"Index\", NULL AS \"TOAST\", pg_size_pretty(pg_database_size('market_data')) AS \"Tong\", ROUND(pg_database_size('market_data') / 1024.0 / 1024.0, 1) AS \"MB\" ORDER BY \"MB\" DESC",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "MB" },
-            "properties": [
-              { "id": "unit", "value": "decmbytes" },
-              { "id": "custom.displayMode", "value": "color-background" },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    { "color": "green", "value": null },
-                    { "color": "yellow", "value": 100 },
-                    { "color": "red", "value": 500 }
-                  ]
+            "id": 2,
+            "type": "gauge",
+            "title": "🖥 Tổng Container CPU Usage",
+            "description": "Tổng % CPU (rate 2 phút) của tất cả container Docker. 100% = 1 lõi vật lý. Ngưỡng vàng = 150%, đỏ = 300%.",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "sum(rate(container_cpu_usage_seconds_total{name!=\"\"}[2m])) * 100",
+                    "legendFormat": "CPU %",
+                    "refId": "A"
                 }
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "sortBy": [{ "displayName": "MB", "desc": true }],
-        "footer": { "show": false },
-        "showHeader": true
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 }
-    },
-
-    {
-      "id": 11,
-      "type": "row",
-      "title": "🔍 Health Check — Trạng thái từng Layer",
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 }
-    },
-
-    {
-      "id": 12,
-      "type": "stat",
-      "title": "Layer 1 — WebSocket Producers",
-      "description": "Số producer đang ws_connected=1 trong 1 phút qua. Xanh = tất cả online.",
-      "datasource": { "type": "postgres", "uid": "timescaledb" },
-      "targets": [
-        {
-          "datasource": { "type": "postgres", "uid": "timescaledb" },
-          "rawSql": "SELECT COUNT(*) AS value FROM (SELECT DISTINCT ON (service_name) service_name, metric_value FROM pipeline_stats WHERE metric_name = 'ws_connected' AND ts > NOW() - INTERVAL '1 minute' ORDER BY service_name, ts DESC) sub WHERE metric_value = 1",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "green", "value": 5 }
-            ]
-          },
-          "mappings": [
-            { "type": "value", "options": { "0": { "text": "OFFLINE", "color": "red" } } },
-            { "type": "range", "options": { "from": 1, "to": 4, "result": { "text": "PARTIAL", "color": "yellow" } } },
-            { "type": "range", "options": { "from": 5, "to": 99, "result": { "text": "ONLINE", "color": "green" } } }
-          ],
-          "unit": "short"
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 400,
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 150
+                            },
+                            {
+                                "color": "red",
+                                "value": 300
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "orientation": "auto",
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true,
+                "text": {}
+            },
+            "gridPos": {
+                "h": 7,
+                "w": 6,
+                "x": 0,
+                "y": 1
+            }
         },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^value$/", "values": false },
-        "orientation": "horizontal",
-        "graphMode": "none",
-        "colorMode": "background",
-        "textMode": "value_and_name"
-      },
-      "gridPos": { "h": 4, "w": 5, "x": 0, "y": 53 }
-    },
-
-    {
-      "id": 13,
-      "type": "stat",
-      "title": "Layer 2 — Kafka Consumer Lag",
-      "description": "Tổng lag của tất cả consumer group TimescaleDB. Lag > 1000 = quá tải.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(kafka_consumergroup_lag{consumergroup=~\"timescaledb-.*\"})",
-          "legendFormat": "Total Lag",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 100 },
-              { "color": "red", "value": 1000 }
-            ]
-          },
-          "mappings": [
-            { "type": "range", "options": { "from": 0, "to": 99, "result": { "text": "OK", "color": "green" } } },
-            { "type": "range", "options": { "from": 100, "to": 999, "result": { "text": "LAG", "color": "yellow" } } },
-            { "type": "range", "options": { "from": 1000, "to": 9999999, "result": { "text": "OVERLOAD", "color": "red" } } }
-          ]
+            "id": 3,
+            "type": "gauge",
+            "title": "🧠 Container RAM Usage (%) / WSL2",
+            "description": "RAM thực tế (Working Set) của tất cả container / Tổng RAM của WSL2 VM (8 GB). Lưu ý: 7.47 GB = tổng RAM của Docker VM, không phải RAM máy vật lý.",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "sum(container_memory_working_set_bytes{name!=\"\"}) / scalar(machine_memory_bytes) * 100",
+                    "legendFormat": "RAM %",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 60
+                            },
+                            {
+                                "color": "red",
+                                "value": 85
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "orientation": "auto",
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true,
+                "text": {}
+            },
+            "gridPos": {
+                "h": 7,
+                "w": 6,
+                "x": 6,
+                "y": 1
+            }
         },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "orientation": "horizontal",
-        "graphMode": "none",
-        "colorMode": "background",
-        "textMode": "value_and_name"
-      },
-      "gridPos": { "h": 4, "w": 4, "x": 5, "y": 53 }
-    },
-
-    {
-      "id": 14,
-      "type": "stat",
-      "title": "Layer 3 — Freshness (market_trade)",
-      "description": "Số phút kể từ tick cuối vào market_trade. Xanh = dữ liệu đang tươi, đỏ = pipeline đang bị nghẽn.",
-      "datasource": { "type": "postgres", "uid": "timescaledb" },
-      "targets": [
         {
-          "datasource": { "type": "postgres", "uid": "timescaledb" },
-          "rawSql": "SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(exchange_ts))) / 60.0, 1) AS value FROM market_trade",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "m",
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 2 },
-              { "color": "red", "value": 10 }
-            ]
-          },
-          "mappings": [
-            { "type": "range", "options": { "from": 0, "to": 1.9, "result": { "text": "FRESH", "color": "green" } } },
-            { "type": "range", "options": { "from": 2, "to": 9.9, "result": { "text": "DELAY", "color": "yellow" } } },
-            { "type": "range", "options": { "from": 10, "to": 99999, "result": { "text": "STALE", "color": "red" } } }
-          ]
+            "id": 4,
+            "type": "stat",
+            "title": "📊 Container RAM Usage Chi Tiết",
+            "description": "RAM Working Set đang dùng (tổng các container) vs. Tổng RAM của Docker VM (WSL2). 7.47 GB là dung lượng Docker VM, không phải RAM vật lý máy host.",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "sum(container_memory_working_set_bytes{name!=\"\"})",
+                    "legendFormat": "Containers dùng",
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "scalar(machine_memory_bytes)",
+                    "legendFormat": "Docker VM total",
+                    "refId": "B"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bytes",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Containers dùng"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "orange",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Docker VM total"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "blue",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "orientation": "vertical",
+                "graphMode": "none",
+                "colorMode": "background",
+                "textMode": "value_and_name"
+            },
+            "gridPos": {
+                "h": 7,
+                "w": 6,
+                "x": 12,
+                "y": 1
+            }
         },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^value$/", "values": false },
-        "orientation": "horizontal",
-        "graphMode": "none",
-        "colorMode": "background",
-        "textMode": "value_and_name"
-      },
-      "gridPos": { "h": 4, "w": 5, "x": 9, "y": 53 }
-    },
-
-    {
-      "id": 15,
-      "type": "stat",
-      "title": "Layer 4 — Airflow DAGs (24h)",
-      "description": "Số DAG run success/failed trong 24h. Đỏ = có lỗi.",
-      "datasource": { "type": "postgres", "uid": "airflow-pg" },
-      "targets": [
         {
-          "datasource": { "type": "postgres", "uid": "airflow-pg" },
-          "rawSql": "SELECT state AS metric, COUNT(*) AS value FROM dag_run WHERE start_date > NOW() - INTERVAL '24 hours' AND state IN ('success', 'failed') GROUP BY state ORDER BY state",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+            "id": 5,
+            "type": "stat",
+            "title": "💿 Docker Disk Usage (WSL2)",
+            "description": "Tổng dung lượng thực tế Docker đang chiếm trên ổ ảo WSL2 (/dev/sde). Ngưỡng vàng = 40 GB, đỏ = 70 GB.",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "container_fs_usage_bytes{id=\"/\", device=\"/dev/sde\"}",
+                    "legendFormat": "Disk đã dùng",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bytes",
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 40000000000
+                            },
+                            {
+                                "color": "red",
+                                "value": 70000000000
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "orientation": "horizontal",
+                "graphMode": "area",
+                "colorMode": "background",
+                "textMode": "auto"
+            },
+            "gridPos": {
+                "h": 7,
+                "w": 6,
+                "x": 18,
+                "y": 1
+            }
         },
-        "overrides": [
-          { "matcher": { "id": "byName", "options": "failed" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "success" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
-        ]
-      },
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^value$/", "values": true },
-        "orientation": "horizontal",
-        "graphMode": "none",
-        "colorMode": "background",
-        "textMode": "value_and_name"
-      },
-      "gridPos": { "h": 4, "w": 5, "x": 14, "y": 53 }
-    },
-
-    {
-      "id": 16,
-      "type": "stat",
-      "title": "Layer 5 — Symbols gap > 60s",
-      "description": "Số symbol active trong giờ giao dịch nhưng không có tick trong 60s. Lý tưởng = 0.",
-      "datasource": { "type": "postgres", "uid": "timescaledb" },
-      "targets": [
         {
-          "datasource": { "type": "postgres", "uid": "timescaledb" },
-          "rawSql": "SELECT CASE WHEN (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::time BETWEEN '09:00' AND '15:00' THEN (SELECT COUNT(*) FROM (WITH active_symbols AS (SELECT DISTINCT symbol FROM instrument_master WHERE is_active = true), last_tick AS (SELECT symbol, MAX(exchange_ts) AS last_trade FROM market_trade WHERE exchange_ts > NOW() - INTERVAL '2 hours' GROUP BY symbol) SELECT a.symbol FROM active_symbols a LEFT JOIN last_tick l ON a.symbol = l.symbol WHERE l.last_trade IS NULL OR NOW() - l.last_trade > INTERVAL '60 seconds') sub) ELSE -1 END AS value",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 10 }
-            ]
-          },
-          "mappings": [
-            { "type": "value", "options": { "0": { "text": "OK (0)", "color": "green" } } },
-            { "type": "value", "options": { "-1": { "text": "Ngoài giờ GD", "color": "grey" } } }
-          ]
+            "id": 6,
+            "type": "timeseries",
+            "title": "📈 Container CPU Usage (%)",
+            "description": "CPU% (rate 2 phút) từng container. Giúp phát hiện container nào đang spike bất thường.",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name!=\"\"}[2m])) * 100",
+                    "legendFormat": "{{name}}",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 10,
+                        "showPoints": "never"
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                },
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "right",
+                    "showLegend": true,
+                    "calcs": [
+                        "last",
+                        "max"
+                    ]
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 8
+            }
         },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^value$/", "values": false },
-        "orientation": "horizontal",
-        "graphMode": "none",
-        "colorMode": "background",
-        "textMode": "value_and_name"
-      },
-      "gridPos": { "h": 4, "w": 5, "x": 19, "y": 53 }
-    }
-
-  ]
+        {
+            "id": 7,
+            "type": "timeseries",
+            "title": "🧠 Container RAM Usage",
+            "description": "Working Set Memory từng container theo thời gian. Phát hiện memory leak khi đường tăng không ngừng.",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "sum by (name) (container_memory_working_set_bytes{name!=\"\"})",
+                    "legendFormat": "{{name}}",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bytes",
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 10,
+                        "showPoints": "never"
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                },
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "right",
+                    "showLegend": true,
+                    "calcs": [
+                        "last",
+                        "max"
+                    ]
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 8
+            }
+        },
+        {
+            "id": 17,
+            "type": "timeseries",
+            "title": "🌐 Network I/O (eth0)",
+            "description": "Tốc độ nhận (RX) và gửi (TX) của từng container qua interface eth0. Giúp phát hiện container nào đang chiếm nhiều băng thông nhất.",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "sum by (name) (rate(container_network_receive_bytes_total{name!=\"\",interface=\"eth0\"}[2m]))",
+                    "legendFormat": "RX {{name}}",
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "-sum by (name) (rate(container_network_transmit_bytes_total{name!=\"\",interface=\"eth0\"}[2m]))",
+                    "legendFormat": "TX {{name}}",
+                    "refId": "B"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "Bps",
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 10,
+                        "showPoints": "never"
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                },
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "right",
+                    "showLegend": true,
+                    "calcs": [
+                        "last",
+                        "mean"
+                    ]
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 16
+            }
+        },
+        {
+            "id": 18,
+            "type": "timeseries",
+            "title": "💾 Disk I/O (Read/Write)",
+            "description": "Tốc độ đọc (Read) và ghi (Write) ổ đĩa WSL2 theo từng container. Write âm theo chiều xuống để dễ phân biệt với Read.",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "sum by (name) (rate(container_fs_reads_bytes_total{name!=\"\",device=\"/dev/sde\"}[2m]))",
+                    "legendFormat": "Read {{name}}",
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "-sum by (name) (rate(container_fs_writes_bytes_total{name!=\"\",device=\"/dev/sde\"}[2m]))",
+                    "legendFormat": "Write {{name}}",
+                    "refId": "B"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "Bps",
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 10,
+                        "showPoints": "never"
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                },
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "right",
+                    "showLegend": true,
+                    "calcs": [
+                        "last",
+                        "mean"
+                    ]
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 16
+            }
+        },
+        {
+            "id": 8,
+            "type": "row",
+            "title": "🐳 Container Health",
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 24
+            }
+        },
+        {
+            "id": 19,
+            "type": "stat",
+            "title": "🐳 Container Health Status",
+            "description": "Mỗi ô = 1 container. Xanh=UP (<20s), Vàng=WARN (20-60s), Đỏ=DOWN (60-300s), Xám=GONE. Sử dụng last_over_time[6d] nên container sẽ không bao giờ mất đi trong vòng 6 ngày (Prometheus retention=7d). Container chỉ biến mất nếu đã stop > 6 ngày.",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "time() - max by (name) (last_over_time(container_last_seen{name!=\"\"}[6d]))",
+                    "legendFormat": "{{name}}",
+                    "refId": "A",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "s",
+                    "decimals": 0,
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 20
+                            },
+                            {
+                                "color": "red",
+                                "value": 60
+                            },
+                            {
+                                "color": "#6e6e6e",
+                                "value": 300
+                            }
+                        ]
+                    },
+                    "mappings": [
+                        {
+                            "type": "range",
+                            "options": {
+                                "from": 0,
+                                "to": 19,
+                                "result": {
+                                    "text": "UP",
+                                    "color": "green"
+                                }
+                            }
+                        },
+                        {
+                            "type": "range",
+                            "options": {
+                                "from": 20,
+                                "to": 59,
+                                "result": {
+                                    "text": "WARN",
+                                    "color": "yellow"
+                                }
+                            }
+                        },
+                        {
+                            "type": "range",
+                            "options": {
+                                "from": 60,
+                                "to": 299,
+                                "result": {
+                                    "text": "DOWN",
+                                    "color": "red"
+                                }
+                            }
+                        },
+                        {
+                            "type": "range",
+                            "options": {
+                                "from": 300,
+                                "to": 999999,
+                                "result": {
+                                    "text": "GONE",
+                                    "color": "#6e6e6e"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "orientation": "auto",
+                "graphMode": "none",
+                "colorMode": "background",
+                "textMode": "value_and_name",
+                "justifyMode": "center",
+                "text": {
+                    "titleSize": 12,
+                    "valueSize": 11
+                }
+            },
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 25
+            }
+        },
+        {
+            "id": 21,
+            "type": "bargauge",
+            "title": "🔄 Container Restarts (1h qua)",
+            "description": "Số lần container bị restart trong 1h qua, đo bởi changes(container_start_time_seconds). Giá trị > 0 = container đang bị crash loop hoặc OOM killed và Docker tự động khởi động lại. Đây là điểm mù của panel Container Health phía trên (vẫn hiện xanh dù đang loop).",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "sort_desc(changes((max by (name) (container_start_time_seconds{name!=\"\"}))[1h:30s]))",
+                    "legendFormat": "{{name}}",
+                    "refId": "A",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "min": 0,
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 1
+                            },
+                            {
+                                "color": "red",
+                                "value": 3
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "orientation": "horizontal",
+                "displayMode": "gradient",
+                "showUnfilled": true,
+                "text": {}
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 35
+            }
+        },
+        {
+            "id": 22,
+            "type": "stat",
+            "title": "💀 OOM Kill Events",
+            "description": "Tổng số lần tất cả container bị kill do hết RAM. Xanh = 0 (bình thường). Đỏ = có container bị OOM. Nếu > 0 cần kiểm tra ngay container nào đang bị crash do hết RAM.",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "sum(container_oom_events_total{name!=\"\"})",
+                    "legendFormat": "OOM Events",
+                    "refId": "A",
+                    "instant": true
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "noValue": "0",
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 1
+                            }
+                        ]
+                    },
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "0": {
+                                    "text": "OK — No OOM",
+                                    "color": "green",
+                                    "index": 0
+                                }
+                            }
+                        }
+                    ]
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "orientation": "auto",
+                "graphMode": "none",
+                "colorMode": "background",
+                "textMode": "value_and_name",
+                "justifyMode": "center",
+                "text": {
+                    "titleSize": 12,
+                    "valueSize": 18
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 35
+            }
+        },
+        {
+            "id": 9,
+            "type": "row",
+            "title": "🗄 TimescaleDB & Storage — Phân bổ dung lượng",
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 43
+            }
+        },
+        {
+            "id": 23,
+            "type": "stat",
+            "title": "🪣 MinIO Delta Lake Storage",
+            "description": "Tổng dung lượng sử dụng và số lượng objects trong bucket market-data trên MinIO.",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "minio_cluster_usage_total_bytes",
+                    "legendFormat": "Dung lượng đã dùng",
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "minio_cluster_usage_object_total",
+                    "legendFormat": "Tổng số Objects",
+                    "refId": "B"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bytes",
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 21474836480
+                            },
+                            {
+                                "color": "red",
+                                "value": 53687091200
+                            }
+                        ]
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Tổng số Objects"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "short"
+                            },
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "blue",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Dung lượng đã dùng"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "green",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "orientation": "horizontal",
+                "graphMode": "none",
+                "colorMode": "background",
+                "textMode": "value_and_name"
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 44
+            }
+        },
+        {
+            "id": 10,
+            "type": "table",
+            "title": "🗄️ Database Storage Chi Tiết",
+            "description": "Dung lượng chi tiết từng hypertable và tổng database market_data. Hàng cuối chỉ hiển thị cột Tổng và MB.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT hypertable_name AS \"Bang\", pg_size_pretty(table_bytes) AS \"Du lieu\", pg_size_pretty(index_bytes) AS \"Index\", pg_size_pretty(toast_bytes) AS \"TOAST\", pg_size_pretty(total_bytes) AS \"Tong\", ROUND(total_bytes / 1024.0 / 1024.0, 1) AS \"MB\" FROM timescaledb_information.hypertables CROSS JOIN LATERAL hypertable_detailed_size((hypertable_schema || '.' || hypertable_name)::regclass) UNION ALL SELECT 'DB (tong)' AS \"Bang\", NULL AS \"Du lieu\", NULL AS \"Index\", NULL AS \"TOAST\", pg_size_pretty(pg_database_size('market_data')) AS \"Tong\", ROUND(pg_database_size('market_data') / 1024.0 / 1024.0, 1) AS \"MB\" ORDER BY \"MB\" DESC",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {},
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "MB"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "decmbytes"
+                            },
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-background"
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "color": "green",
+                                            "value": null
+                                        },
+                                        {
+                                            "color": "yellow",
+                                            "value": 100
+                                        },
+                                        {
+                                            "color": "red",
+                                            "value": 500
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "MB",
+                        "desc": true
+                    }
+                ],
+                "footer": {
+                    "show": false
+                },
+                "showHeader": true
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 44
+            }
+        },
+        {
+            "id": 11,
+            "type": "row",
+            "title": "🔍 Health Check — Trạng thái từng Layer",
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 52
+            }
+        },
+        {
+            "id": 12,
+            "type": "stat",
+            "title": "Layer 1 — WebSocket Producer Status",
+            "description": "Số producer đang ws_connected=1 trong 1 phút qua. Xanh = tất cả online.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT COUNT(*) AS value FROM (SELECT DISTINCT ON (service_name) service_name, metric_value FROM pipeline_stats WHERE metric_name = 'ws_connected' AND ts > NOW() - INTERVAL '1 minute' ORDER BY service_name, ts DESC) sub WHERE metric_value = 1",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 1
+                            },
+                            {
+                                "color": "green",
+                                "value": 5
+                            }
+                        ]
+                    },
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "0": {
+                                    "text": "OFFLINE",
+                                    "color": "red"
+                                }
+                            }
+                        },
+                        {
+                            "type": "range",
+                            "options": {
+                                "from": 1,
+                                "to": 4,
+                                "result": {
+                                    "text": "PARTIAL",
+                                    "color": "yellow"
+                                }
+                            }
+                        },
+                        {
+                            "type": "range",
+                            "options": {
+                                "from": 5,
+                                "to": 99,
+                                "result": {
+                                    "text": "ONLINE",
+                                    "color": "green"
+                                }
+                            }
+                        }
+                    ],
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^value$/",
+                    "values": false
+                },
+                "orientation": "horizontal",
+                "graphMode": "none",
+                "colorMode": "background",
+                "textMode": "value_and_name"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 5,
+                "x": 0,
+                "y": 53
+            }
+        },
+        {
+            "id": 13,
+            "type": "stat",
+            "title": "Layer 2 — Kafka Consumer Lag",
+            "description": "Tổng lag của tất cả consumer group TimescaleDB. Lag > 1000 = quá tải.",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "prometheus"
+                    },
+                    "expr": "sum(kafka_consumergroup_lag{consumergroup=~\"timescaledb-.*\"})",
+                    "legendFormat": "Total Lag",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 100
+                            },
+                            {
+                                "color": "red",
+                                "value": 1000
+                            }
+                        ]
+                    },
+                    "mappings": [
+                        {
+                            "type": "range",
+                            "options": {
+                                "from": 0,
+                                "to": 99,
+                                "result": {
+                                    "text": "OK",
+                                    "color": "green"
+                                }
+                            }
+                        },
+                        {
+                            "type": "range",
+                            "options": {
+                                "from": 100,
+                                "to": 999,
+                                "result": {
+                                    "text": "LAG",
+                                    "color": "yellow"
+                                }
+                            }
+                        },
+                        {
+                            "type": "range",
+                            "options": {
+                                "from": 1000,
+                                "to": 9999999,
+                                "result": {
+                                    "text": "OVERLOAD",
+                                    "color": "red"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "orientation": "horizontal",
+                "graphMode": "none",
+                "colorMode": "background",
+                "textMode": "value_and_name"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 5,
+                "y": 53
+            }
+        },
+        {
+            "id": 14,
+            "type": "stat",
+            "title": "Layer 3 — Data Freshness (market_trade)",
+            "description": "Số phút kể từ tick cuối vào market_trade. Xanh = dữ liệu đang tươi, đỏ = pipeline đang bị nghẽn.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(exchange_ts))) / 60.0, 1) AS value FROM market_trade WHERE is_backfill = false",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "m",
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 2
+                            },
+                            {
+                                "color": "red",
+                                "value": 10
+                            }
+                        ]
+                    },
+                    "mappings": [
+                        {
+                            "type": "range",
+                            "options": {
+                                "from": 0,
+                                "to": 1.9,
+                                "result": {
+                                    "text": "FRESH",
+                                    "color": "green"
+                                }
+                            }
+                        },
+                        {
+                            "type": "range",
+                            "options": {
+                                "from": 2,
+                                "to": 9.9,
+                                "result": {
+                                    "text": "DELAY",
+                                    "color": "yellow"
+                                }
+                            }
+                        },
+                        {
+                            "type": "range",
+                            "options": {
+                                "from": 10,
+                                "to": 99999,
+                                "result": {
+                                    "text": "STALE",
+                                    "color": "red"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^value$/",
+                    "values": false
+                },
+                "orientation": "horizontal",
+                "graphMode": "none",
+                "colorMode": "background",
+                "textMode": "value_and_name"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 5,
+                "x": 9,
+                "y": 53
+            }
+        },
+        {
+            "id": 15,
+            "type": "stat",
+            "title": "Layer 4 — Airflow DAGs Run (24h)",
+            "description": "Số DAG run success/failed trong 24h. Đỏ = có lỗi.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "airflow-pg"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "airflow-pg"
+                    },
+                    "rawSql": "SELECT state AS metric, COUNT(*) AS value FROM dag_run WHERE start_date > NOW() - INTERVAL '24 hours' AND state IN ('success', 'failed') GROUP BY state ORDER BY state",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "failed"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "red",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "success"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "green",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^value$/",
+                    "values": true
+                },
+                "orientation": "horizontal",
+                "graphMode": "none",
+                "colorMode": "background",
+                "textMode": "value_and_name"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 5,
+                "x": 14,
+                "y": 53
+            }
+        },
+        {
+            "id": 16,
+            "type": "stat",
+            "title": "Layer 5 — Tick Gap > 60s",
+            "description": "Số symbol active trong giờ giao dịch nhưng không có tick trong 60s. Lý tưởng = 0.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT CASE WHEN (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::time BETWEEN '09:00' AND '15:00' THEN (SELECT COUNT(*) FROM (WITH active_symbols AS (SELECT DISTINCT symbol FROM instrument_master WHERE is_active = true), last_tick AS (SELECT symbol, MAX(exchange_ts) AS last_trade FROM market_trade WHERE is_backfill = false AND exchange_ts > NOW() - INTERVAL '2 hours' GROUP BY symbol) SELECT a.symbol FROM active_symbols a LEFT JOIN last_tick l ON a.symbol = l.symbol WHERE l.last_trade IS NULL OR NOW() - l.last_trade > INTERVAL '60 seconds') sub) ELSE -1 END AS value",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 1
+                            },
+                            {
+                                "color": "red",
+                                "value": 10
+                            }
+                        ]
+                    },
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "0": {
+                                    "text": "OK (0)",
+                                    "color": "green"
+                                }
+                            }
+                        },
+                        {
+                            "type": "value",
+                            "options": {
+                                "-1": {
+                                    "text": "Ngoài giờ GD",
+                                    "color": "grey"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^value$/",
+                    "values": false
+                },
+                "orientation": "horizontal",
+                "graphMode": "none",
+                "colorMode": "background",
+                "textMode": "value_and_name"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 5,
+                "x": 19,
+                "y": 53
+            }
+        }
+    ]
 }

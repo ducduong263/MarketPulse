@@ -167,6 +167,7 @@ class StatsReporter:
             (self.service_name, "reconnect_count",  float(reconnect_total), None),
             (self.service_name, "msg_per_sec",      round(msg_per_sec, 4),  None),
             (self.service_name, "avro_error_count", float(avro_errors),     None),
+            (self.service_name, "ws_connected",     float(ws_connected),    None),
         ]
 
         # Add per-topic consumer lag rows

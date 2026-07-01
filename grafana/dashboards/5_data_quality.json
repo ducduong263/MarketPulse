@@ -1,188 +1,815 @@
 {
-  "annotations": {"list": []},
-  "editable": true,
-  "graphTooltip": 1,
-  "id": null,
-  "links": [
-    { "title": "Overview", "type": "dashboard", "url": "/d/mp-overview", "icon": "external link", "tooltip": "System status overview", "targetBlank": false },
-    { "title": "Layer 1 — Ingestion", "type": "dashboard", "url": "/d/mp-ingestion", "icon": "external link", "tooltip": "WebSocket status, reconnects, throughput", "targetBlank": false },
-    { "title": "Layer 2 — Kafka", "type": "dashboard", "url": "/d/mp-kafka", "icon": "external link", "tooltip": "Consumer lag, messages/sec, offsets", "targetBlank": false },
-    { "title": "Layer 3 — Storage", "type": "dashboard", "url": "/d/mp-storage", "icon": "external link", "tooltip": "Data freshness, latency, compression, disk", "targetBlank": false },
-    { "title": "Layer 4 — Airflow", "type": "dashboard", "url": "/d/mp-airflow", "icon": "external link", "tooltip": "DAG runs, task status", "targetBlank": false }
-  ],
-  "refresh": "1m",
-  "schemaVersion": 39,
-  "tags": ["marketpulse"],
-  "templating": {"list": []},
-  "time": {"from": "now-6h", "to": "now"},
-  "timepicker": {},
-  "timezone": "Asia/Ho_Chi_Minh",
-  "title": "Layer 5 — Data Quality",
-  "uid": "mp-data-quality",
-  "version": 1,
-  "panels": [
-    {
-      "id": 1,
-      "type": "table",
-      "title": "🕳 Tick Gap Detector — Symbols không có trade > 60s (trong giờ giao dịch)",
-      "description": "Symbols đang active nhưng không nhận được tick trong 60s trong giờ giao dịch HOSE (09:00–15:00). Có thể do producer không subscribe đúng symbol.",
-      "datasource": {"type": "postgres", "uid": "timescaledb"},
-      "targets": [{
-        "datasource": {"type": "postgres", "uid": "timescaledb"},
-        "rawSql": "WITH active_symbols AS (SELECT DISTINCT symbol FROM instrument_master WHERE is_active = true), last_tick AS (SELECT symbol, MAX(exchange_ts) AS last_trade FROM market_trade WHERE exchange_ts > NOW() - INTERVAL '2 hours' GROUP BY symbol) SELECT a.symbol AS \"Symbol\", COALESCE(to_char(l.last_trade AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI:SS'), 'Chưa có tick hôm nay') AS \"Tick Cuối (ICT)\", ROUND(EXTRACT(EPOCH FROM (NOW() - l.last_trade))::numeric, 0) AS \"Giây Không Có Tick\" FROM active_symbols a LEFT JOIN last_tick l ON a.symbol = l.symbol WHERE (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::time BETWEEN '09:00' AND '15:00' AND (l.last_trade IS NULL OR NOW() - l.last_trade > INTERVAL '60 seconds') ORDER BY \"Giây Không Có Tick\" DESC NULLS FIRST LIMIT 30",
-        "format": "table",
-        "refId": "A"
-      }],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {"id": "byName", "options": "Giây Không Có Tick"},
-            "properties": [
-              {"id": "unit", "value": "s"},
-              {"id": "custom.displayMode", "value": "color-background"},
-              {"id": "thresholds", "value": {
-                "mode": "absolute",
-                "steps": [{"color": "yellow", "value": null}, {"color": "orange", "value": 120}, {"color": "red", "value": 300}]
-              }}
-            ]
-          }
-        ]
-      },
-      "options": {"sortBy": [{"displayName": "Giây Không Có Tick", "desc": true}], "footer": {"show": false}, "showHeader": true},
-      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 0}
+    "annotations": {
+        "list": []
     },
-    {
-      "id": 2,
-      "type": "table",
-      "title": "🚨 Price Anomaly — Giá vượt Trần/Sàn từ Security Definition",
-      "description": "Giao dịch có giá nằm ngoài giới hạn trần/sàn theo Security Definition. Phát hiện lỗi parse dữ liệu hoặc dữ liệu sai từ nguồn.",
-      "datasource": {"type": "postgres", "uid": "timescaledb"},
-      "targets": [{
-        "datasource": {"type": "postgres", "uid": "timescaledb"},
-        "rawSql": "SELECT t.symbol AS \"Symbol\", t.price AS \"Giá GD\", sd.ceiling_price AS \"Trần\", sd.floor_price AS \"Sàn\", CASE WHEN t.price > sd.ceiling_price THEN '🔴 Vượt Trần' WHEN t.price < sd.floor_price THEN '🔵 Dưới Sàn' END AS \"Loại\", to_char(t.exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI:SS') AS \"Thời gian\" FROM market_trade t JOIN security_definition sd ON t.symbol = sd.symbol AND t.market_id = sd.market_id AND sd.trading_date = (CURRENT_DATE AT TIME ZONE 'Asia/Ho_Chi_Minh') WHERE t.exchange_ts > NOW() - INTERVAL '1 hour' AND sd.ceiling_price IS NOT NULL AND (t.price > sd.ceiling_price OR t.price < sd.floor_price) ORDER BY t.exchange_ts DESC LIMIT 50",
-        "format": "table",
-        "refId": "A"
-      }],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {"id": "byName", "options": "Loại"},
-            "properties": [{"id": "custom.displayMode", "value": "color-text"}]
-          }
-        ]
-      },
-      "options": {"sortBy": [], "footer": {"show": false}, "showHeader": true},
-      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0}
-    },
-    {
-      "id": 3,
-      "type": "timeseries",
-      "title": "📉 Null/Zero Bid-Ask Rate — order_book_l2",
-      "description": "% record có bid_price1 hoặc ask_price1 bị null/zero. Tăng đột biến = lỗi parse hoặc sàn gửi dữ liệu thiếu.",
-      "datasource": {"type": "postgres", "uid": "timescaledb"},
-      "targets": [{
-        "datasource": {"type": "postgres", "uid": "timescaledb"},
-        "rawSql": "SELECT time_bucket('5 minutes', exchange_ts) AS time, ROUND(100.0 * COUNT(*) FILTER (WHERE bid_price1 IS NULL OR bid_price1 = 0) / NULLIF(COUNT(*), 0), 2) AS \"Null Bid %\", ROUND(100.0 * COUNT(*) FILTER (WHERE ask_price1 IS NULL OR ask_price1 = 0) / NULLIF(COUNT(*), 0), 2) AS \"Null Ask %\" FROM order_book_l2 WHERE $__timeFilter(exchange_ts) GROUP BY 1 ORDER BY 1",
-        "format": "time_series",
-        "refId": "A"
-      }],
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "palette-classic"},
-          "custom": {"lineWidth": 2, "fillOpacity": 15},
-          "unit": "percent",
-          "min": 0,
-          "max": 100,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 5}, {"color": "red", "value": 20}]
-          }
-        }
-      },
-      "options": {
-        "tooltip": {"mode": "multi"},
-        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}
-      },
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 9}
-    },
-    {
-      "id": 4,
-      "type": "table",
-      "title": "📊 Session OHLCV Completeness — Symbols theo ATO/Liên tục/ATC",
-      "description": "Số tick mỗi symbol nhận được trong ATO (09:00-09:15), giờ liên tục và ATC (14:30-15:00). Symbols có 0 tick = không subscribe hoặc mã không giao dịch hôm nay.",
-      "datasource": {"type": "postgres", "uid": "timescaledb"},
-      "targets": [{
-        "datasource": {"type": "postgres", "uid": "timescaledb"},
-        "rawSql": "SELECT symbol AS \"Symbol\", COUNT(*) FILTER (WHERE (exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::time BETWEEN '09:00' AND '09:15') AS \"ATO Ticks\", COUNT(*) FILTER (WHERE (exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::time BETWEEN '09:15' AND '14:30') AS \"Liên Tục Ticks\", COUNT(*) FILTER (WHERE (exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::time BETWEEN '14:30' AND '15:00') AS \"ATC Ticks\", COUNT(*) AS \"Tổng Hôm Nay\", ROUND(MIN(price)::numeric, 2) AS \"Low\", ROUND(MAX(price)::numeric, 2) AS \"High\" FROM market_trade WHERE exchange_ts >= (CURRENT_DATE AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY symbol HAVING COUNT(*) > 0 ORDER BY \"Tổng Hôm Nay\" ASC LIMIT 50",
-        "format": "table",
-        "refId": "A"
-      }],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {"id": "byName", "options": "ATO Ticks"},
-            "properties": [
-              {"id": "custom.displayMode", "value": "color-background"},
-              {"id": "thresholds", "value": {
-                "mode": "absolute",
-                "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 1}, {"color": "green", "value": 5}]
-              }}
-            ]
-          },
-          {
-            "matcher": {"id": "byName", "options": "ATC Ticks"},
-            "properties": [
-              {"id": "custom.displayMode", "value": "color-background"},
-              {"id": "thresholds", "value": {
-                "mode": "absolute",
-                "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 1}, {"color": "green", "value": 5}]
-              }}
-            ]
-          }
-        ]
-      },
-      "options": {"sortBy": [{"displayName": "Tổng Hôm Nay", "desc": false}], "footer": {"show": false}, "showHeader": true},
-      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 17}
-    },
-    {
-      "id": 5,
-      "type": "stat",
-      "title": "📊 Tổng Hôm Nay",
-      "datasource": {"type": "postgres", "uid": "timescaledb"},
-      "targets": [{
-        "datasource": {"type": "postgres", "uid": "timescaledb"},
-        "rawSql": "SELECT 'Symbols có tick' AS metric, COUNT(DISTINCT symbol)::double precision AS value FROM market_trade WHERE exchange_ts >= (CURRENT_DATE AT TIME ZONE 'Asia/Ho_Chi_Minh') UNION ALL SELECT 'Tổng trade ticks', COUNT(*)::double precision FROM market_trade WHERE exchange_ts >= (CURRENT_DATE AT TIME ZONE 'Asia/Ho_Chi_Minh') UNION ALL SELECT 'Anomaly giá', COUNT(*)::double precision FROM market_trade t JOIN security_definition sd ON t.symbol = sd.symbol AND t.market_id = sd.market_id AND sd.trading_date = (CURRENT_DATE AT TIME ZONE 'Asia/Ho_Chi_Minh') WHERE t.exchange_ts >= (CURRENT_DATE AT TIME ZONE 'Asia/Ho_Chi_Minh') AND sd.ceiling_price IS NOT NULL AND (t.price > sd.ceiling_price OR t.price < sd.floor_price)",
-        "format": "table",
-        "refId": "A"
-      }],
-      "fieldConfig": {
-        "defaults": {
-          "color": {"mode": "palette-classic"},
-          "unit": "short"
+    "editable": true,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [
+        {
+            "title": "Overview",
+            "type": "dashboard",
+            "url": "/d/mp-overview",
+            "icon": "external link",
+            "tooltip": "System status overview",
+            "targetBlank": false
         },
-        "overrides": [
-          {
-            "matcher": {"id": "byName", "options": "Anomaly giá"},
-            "properties": [
-              {"id": "color", "value": {"mode": "thresholds"}},
-              {"id": "thresholds", "value": {
-                "mode": "absolute",
-                "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]
-              }}
-            ]
-          }
-        ]
-      },
-      "options": {
-        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "/^value$/", "values": true},
-        "orientation": "horizontal",
-        "textMode": "value_and_name",
-        "colorMode": "background"
-      },
-      "gridPos": {"h": 4, "w": 24, "x": 0, "y": 27}
-    }
-  ]
+        {
+            "title": "Layer 1 — Ingestion",
+            "type": "dashboard",
+            "url": "/d/mp-ingestion",
+            "icon": "external link",
+            "tooltip": "WebSocket status, reconnects, throughput",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 2 — Kafka",
+            "type": "dashboard",
+            "url": "/d/mp-kafka",
+            "icon": "external link",
+            "tooltip": "Consumer lag, messages/sec, offsets",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 3 — Storage",
+            "type": "dashboard",
+            "url": "/d/mp-storage",
+            "icon": "external link",
+            "tooltip": "Data freshness, latency, compression, disk",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 4 — Airflow",
+            "type": "dashboard",
+            "url": "/d/mp-airflow",
+            "icon": "external link",
+            "tooltip": "DAG runs, task status",
+            "targetBlank": false
+        }
+    ],
+    "refresh": "1m",
+    "schemaVersion": 39,
+    "tags": [
+        "marketpulse"
+    ],
+    "templating": {
+        "list": []
+    },
+    "time": {
+        "from": "now-6h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "Asia/Ho_Chi_Minh",
+    "title": "Layer 5 — Data Quality",
+    "uid": "mp-data-quality",
+    "version": 2,
+    "panels": [
+        {
+            "id": 1,
+            "type": "row",
+            "title": "📡 Completeness — Tick & Volume",
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            }
+        },
+        {
+            "id": 2,
+            "type": "table",
+            "title": "🕳 Tick Gap Detector — Mã đã Subscribe không có trade > 60s",
+            "description": "Chỉ giám sát các mã đang subscribe theo pipeline_config (board G1, VN30/VN100/HNX30 + FU, status NO_HALT/NRM). Nếu có mã đỏ trong giờ giao dịch = producer không nhận được tick cho mã đó.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "WITH time_calc AS (\n  SELECT \n    CASE\n      WHEN (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::time < '09:00' THEN date_trunc('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') + INTERVAL '9 hours'\n      WHEN (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::time BETWEEN '11:30' AND '13:00' THEN date_trunc('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') + INTERVAL '11 hours 30 minutes'\n      WHEN (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::time >= '14:45' THEN date_trunc('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') + INTERVAL '14 hours 45 minutes'\n      ELSE NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh'\n    END AS ref_time\n),\nsubscribed AS (\n  -- Mirror SymbolResolver DB-mode query (pipeline_config defaults):\n  -- board_id=G1, status=NO_HALT, admin=NRM, sanction=NRM\n  -- selection: index_name IN (VN30) OR security_group_id=FU\n  SELECT DISTINCT sd.symbol\n  FROM security_definition sd\n  JOIN instrument_master im\n    ON sd.symbol = im.symbol\n   AND sd.market_id = im.market_id\n  WHERE sd.trading_date = CURRENT_DATE\n    AND sd.board_id = 'G1'\n    AND sd.security_status = 'NO_HALT'\n    AND sd.admin_status = 'NRM'\n    AND sd.trading_sanction_status = 'NRM'\n    AND im.is_active = true\n    AND (\n      im.security_group_id = 'FU'\n      OR im.index_name ~ '(^|,)(VN30)(,|$)'\n    )\n),\nlast_tick AS (\n  SELECT symbol, MAX(exchange_ts) AT TIME ZONE 'Asia/Ho_Chi_Minh' AS last_trade\n  FROM market_trade\n  WHERE is_backfill = false AND exchange_ts >= (date_trunc('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh')\n  GROUP BY symbol\n)\nSELECT\n  a.symbol AS \"Symbol\",\n  COALESCE(to_char(l.last_trade, 'HH24:MI:SS'), 'Chưa có tick hôm nay') AS \"Tick Cuối (ICT)\",\n  ROUND(EXTRACT(EPOCH FROM (tc.ref_time - l.last_trade))::numeric, 0) AS \"Giây Không Có Tick\"\nFROM subscribed a\nCROSS JOIN time_calc tc\nLEFT JOIN last_tick l ON a.symbol = l.symbol\nWHERE\n  (l.last_trade IS NULL OR tc.ref_time - l.last_trade > INTERVAL '60 seconds')\nORDER BY \"Giây Không Có Tick\" DESC NULLS FIRST\nLIMIT 50",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "noValue": "-"
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Giây Không Có Tick"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "s"
+                            },
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-background"
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "color": "yellow",
+                                            "value": null
+                                        },
+                                        {
+                                            "color": "orange",
+                                            "value": 120
+                                        },
+                                        {
+                                            "color": "red",
+                                            "value": 300
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "Giây Không Có Tick",
+                        "desc": true
+                    }
+                ],
+                "footer": {
+                    "show": false
+                },
+                "showHeader": true
+            },
+            "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 0,
+                "y": 1
+            }
+        },
+        {
+            "id": 3,
+            "type": "timeseries",
+            "title": "📊 Inter-Message Gap theo Symbol (ms)",
+            "description": "Khoảng cách thời gian (ms) giữa 2 tick liên tiếp của cùng 1 symbol. Spike cao = gián đoạn dữ liệu từ sàn hoặc producer bị treo. Dùng threshold đỏ để xác định gap đáng ngờ.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "WITH gaps AS (\n  SELECT\n    symbol,\n    exchange_ts,\n    LAG(exchange_ts) OVER (PARTITION BY symbol ORDER BY exchange_ts, session_vol) AS prev_ts,\n    EXTRACT(EPOCH FROM (\n      exchange_ts - LAG(exchange_ts) OVER (PARTITION BY symbol ORDER BY exchange_ts, session_vol)\n    )) * 1000 AS gap_ms\n  FROM market_trade\n  WHERE is_backfill = false AND $__timeFilter(exchange_ts)\n)\nSELECT\n  time_bucket('1 minute', exchange_ts) AS time,\n  symbol AS metric,\n  ROUND(MAX(gap_ms)::numeric, 0) AS value\nFROM gaps\nWHERE gap_ms IS NOT NULL\n  AND gap_ms > 60000\n  -- Bỏ qua gap sinh ra do nghỉ trưa (tick đầu tiên lúc 13:00 trừ tick cuối lúc 11:30)\n  AND NOT (\n    (exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::time >= '13:00:00'\n    AND (prev_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::time <= '11:30:59'\n  )\nGROUP BY 1, 2\nORDER BY 1",
+                    "format": "time_series",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 1,
+                        "fillOpacity": 5,
+                        "drawStyle": "points",
+                        "pointSize": 5
+                    },
+                    "unit": "ms",
+                    "min": 0,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 5000
+                            },
+                            {
+                                "color": "red",
+                                "value": 30000
+                            }
+                        ]
+                    }
+                }
+            },
+            "options": {
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                },
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "right",
+                    "showLegend": true
+                }
+            },
+            "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 12,
+                "y": 1
+            }
+        },
+        {
+            "id": 4,
+            "type": "table",
+            "title": "📦 Volume Delta Anomaly — Tick bị miss (session_vol nhảy bất thường)",
+            "description": "Phát hiện tick bị mất thầm lặng: delta session_vol giữa 2 tick liên tiếp lớn hơn 3× quantity của tick hiện tại = có volume không giải thích được = tick bị miss ở giữa. Nguy hiểm hơn gap thông thường vì WebSocket vẫn connected.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "WITH deltas AS (\n  SELECT\n    symbol,\n    market_id,\n    exchange_ts,\n    price,\n    quantity,\n    session_vol,\n    session_vol - LAG(session_vol) OVER (PARTITION BY symbol ORDER BY exchange_ts, session_vol) AS vol_delta,\n    LAG(session_vol)         OVER (PARTITION BY symbol ORDER BY exchange_ts, session_vol) AS prev_session_vol,\n    LAG(exchange_ts)         OVER (PARTITION BY symbol ORDER BY exchange_ts, session_vol) AS prev_ts\n  FROM market_trade\n  WHERE exchange_ts >= (date_trunc('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh')\n    AND session_vol IS NOT NULL\n)\nSELECT\n  symbol                                                              AS \"Symbol\",\n  market_id                                                           AS \"Sàn\",\n  to_char(exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI:SS') AS \"Thời gian\",\n  quantity                                                            AS \"Qty Tick Này\",\n  vol_delta                                                           AS \"Delta Vol\",\n  ROUND((vol_delta::numeric / NULLIF(quantity, 0)), 1)                AS \"Bội số (×qty)\",\n  ROUND(EXTRACT(EPOCH FROM (exchange_ts - prev_ts))::numeric, 1)      AS \"Gap trước (s)\"\nFROM deltas\nWHERE vol_delta > quantity * 3\n  AND prev_session_vol IS NOT NULL\n  AND quantity > 0\nORDER BY exchange_ts DESC\nLIMIT 50",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "noValue": "✅ Không có tick bị miss trong 6 giờ qua"
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Bội số (×qty)"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-background"
+                            },
+                            {
+                                "id": "unit",
+                                "value": "short"
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "color": "yellow",
+                                            "value": null
+                                        },
+                                        {
+                                            "color": "orange",
+                                            "value": 5
+                                        },
+                                        {
+                                            "color": "red",
+                                            "value": 10
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Gap trước (s)"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "s"
+                            },
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-background"
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "color": "green",
+                                            "value": null
+                                        },
+                                        {
+                                            "color": "yellow",
+                                            "value": 5
+                                        },
+                                        {
+                                            "color": "red",
+                                            "value": 30
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "Bội số (×qty)",
+                        "desc": true
+                    }
+                ],
+                "footer": {
+                    "show": false
+                },
+                "showHeader": true
+            },
+            "gridPos": {
+                "h": 9,
+                "w": 24,
+                "x": 0,
+                "y": 10
+            }
+        },
+        {
+            "id": 5,
+            "type": "row",
+            "title": "🎯 Accuracy — Price & Quote Anomaly",
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 19
+            }
+        },
+        {
+            "id": 6,
+            "type": "table",
+            "title": "🚨 Price Anomaly — Giá vượt Trần/Sàn từ Security Definition",
+            "description": "Giao dịch có giá nằm ngoài giới hạn trần/sàn theo Security Definition. Phát hiện lỗi parse dữ liệu hoặc dữ liệu sai từ nguồn.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT\n  t.symbol                                                              AS \"Symbol\",\n  t.price                                                               AS \"Giá GD\",\n  sd.ceiling_price                                                      AS \"Trần\",\n  sd.floor_price                                                        AS \"Sàn\",\n  CASE\n    WHEN t.price > sd.ceiling_price THEN '🔴 Vượt Trần'\n    WHEN t.price < sd.floor_price   THEN '🔵 Dưới Sàn'\n  END                                                                   AS \"Loại\",\n  to_char(t.exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI:SS') AS \"Thời gian\"\nFROM market_trade t\nJOIN security_definition sd\n  ON t.symbol     = sd.symbol\n  AND t.market_id  = sd.market_id\n  AND sd.trading_date = (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date\nWHERE t.exchange_ts >= (date_trunc('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh')\n  AND sd.ceiling_price IS NOT NULL\n  AND (t.price > sd.ceiling_price OR t.price < sd.floor_price)\nORDER BY t.exchange_ts DESC\nLIMIT 50",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "noValue": "✅ Không có giá bất thường hôm nay"
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Loại"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-text"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "options": {
+                "sortBy": [],
+                "footer": {
+                    "show": false
+                },
+                "showHeader": true
+            },
+            "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 0,
+                "y": 20
+            }
+        },
+        {
+            "id": 7,
+            "type": "table",
+            "title": "📉 Spread Anomaly — order_book_l2 (Spread âm hoặc bất thường)",
+            "description": "Spread âm (ask < bid) = lỗi parse nghiêm trọng. Spread > 10% giá bid = quote bất thường, có thể do sàn gửi thiếu level hoặc producer parse sai field.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT\n  symbol                                                                AS \"Symbol\",\n  market_id                                                             AS \"Sàn\",\n  to_char(exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI:SS')   AS \"Thời gian\",\n  ROUND(bid_price1::numeric, 2)                                         AS \"Bid\",\n  ROUND(ask_price1::numeric, 2)                                         AS \"Ask\",\n  ROUND(spread::numeric, 2)                                             AS \"Spread\",\n  CASE\n    WHEN spread < 0                          THEN '🔴 Spread Âm'\n    WHEN spread > bid_price1 * 0.1           THEN '🟡 Spread > 10%'\n  END                                                                   AS \"Loại\"\nFROM order_book_l2\nWHERE exchange_ts >= (date_trunc('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh')\n  AND bid_price1 IS NOT NULL\n  AND ask_price1 IS NOT NULL\n  AND bid_price1 > 0\n  AND (spread < 0 OR spread > bid_price1 * 0.1)\n  AND (exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::time NOT BETWEEN '08:45:00' AND '08:45:05'\n  AND (exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::time NOT BETWEEN '09:00:00' AND '09:00:05'\nORDER BY exchange_ts DESC\nLIMIT 50",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "noValue": "✅ Không có spread bất thường trong ngày hôm nay"
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Spread"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "short"
+                            },
+                            {
+                                "id": "custom.displayMode",
+                                "value": "auto"
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Loại"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-text"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "Spread",
+                        "desc": false
+                    }
+                ],
+                "footer": {
+                    "show": false
+                },
+                "showHeader": true
+            },
+            "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 12,
+                "y": 20
+            }
+        },
+        {
+            "id": 8,
+            "type": "timeseries",
+            "title": "📉 Tỷ lệ Null/Zero Bid-Ask — order_book_l2",
+            "description": "% record có bid_price1 hoặc ask_price1 bị null/zero. Tăng đột biến = lỗi parse hoặc sàn gửi dữ liệu thiếu.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT\n  time_bucket('5 minutes', exchange_ts) AS time,\n  ROUND(100.0 * COUNT(*) FILTER (WHERE bid_price1 IS NULL OR bid_price1 = 0) / NULLIF(COUNT(*), 0), 2) AS \"Null Bid %\",\n  ROUND(100.0 * COUNT(*) FILTER (WHERE ask_price1 IS NULL OR ask_price1 = 0) / NULLIF(COUNT(*), 0), 2) AS \"Null Ask %\"\nFROM order_book_l2\nWHERE $__timeFilter(exchange_ts)\nGROUP BY 1\nORDER BY 1",
+                    "format": "time_series",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 15
+                    },
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 5
+                            },
+                            {
+                                "color": "red",
+                                "value": 20
+                            }
+                        ]
+                    }
+                }
+            },
+            "options": {
+                "tooltip": {
+                    "mode": "multi"
+                },
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 29
+            }
+        },
+        {
+            "id": 9,
+            "type": "row",
+            "title": "📅 Session Completeness — OHLCV & Coverage",
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 37
+            }
+        },
+        {
+            "id": 10,
+            "type": "table",
+            "title": "📊 Độ phủ Session OHLCV — Mã theo ATO/Liên tục/ATC",
+            "description": "Số tick mỗi symbol nhận được trong ATO (09:00-09:15), giờ liên tục và ATC (14:30-15:00). Symbols có 0 tick = không subscribe hoặc mã không giao dịch hôm nay.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT\n  symbol                                                                                                      AS \"Symbol\",\n  COUNT(*) FILTER (WHERE (exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::time BETWEEN '09:00' AND '09:15')     AS \"ATO Ticks\",\n  COUNT(*) FILTER (WHERE (exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::time BETWEEN '09:15' AND '14:30')     AS \"Liên Tục Ticks\",\n  COUNT(*) FILTER (WHERE (exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::time BETWEEN '14:30' AND '15:00')     AS \"ATC Ticks\",\n  COUNT(*)                                                                                                     AS \"Tổng Hôm Nay\",\n  ROUND(MIN(price)::numeric, 2)                                                                               AS \"Low\",\n  ROUND(MAX(price)::numeric, 2)                                                                               AS \"High\"\nFROM market_trade\nWHERE exchange_ts >= (date_trunc('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh')\nGROUP BY symbol\nHAVING COUNT(*) > 0\nORDER BY \"Tổng Hôm Nay\" ASC\nLIMIT 50",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {},
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "ATO Ticks"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-background"
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "color": "red",
+                                            "value": null
+                                        },
+                                        {
+                                            "color": "yellow",
+                                            "value": 1
+                                        },
+                                        {
+                                            "color": "green",
+                                            "value": 5
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "ATC Ticks"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-background"
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "color": "red",
+                                            "value": null
+                                        },
+                                        {
+                                            "color": "yellow",
+                                            "value": 1
+                                        },
+                                        {
+                                            "color": "green",
+                                            "value": 5
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "Tổng Hôm Nay",
+                        "desc": false
+                    }
+                ],
+                "footer": {
+                    "show": false
+                },
+                "showHeader": true
+            },
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 38
+            }
+        },
+        {
+            "id": 11,
+            "type": "stat",
+            "title": "🩺 Thống Kê Chất Lượng & Bất Thường",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT\n  (SELECT COUNT(DISTINCT symbol)::double precision FROM market_trade WHERE exchange_ts >= (date_trunc('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh')) AS \"Symbols có tick\",\n  (SELECT COUNT(*)::double precision FROM market_trade WHERE exchange_ts >= (date_trunc('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh')) AS \"Tổng trade ticks\",\n  (SELECT COUNT(*)::double precision FROM market_trade t JOIN security_definition sd ON t.symbol = sd.symbol AND t.market_id = sd.market_id AND sd.trading_date = (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date WHERE t.exchange_ts >= (date_trunc('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh') AND sd.ceiling_price IS NOT NULL AND (t.price > sd.ceiling_price OR t.price < sd.floor_price)) AS \"Anomaly giá\",\n  (SELECT COUNT(*)::double precision FROM (\n    SELECT session_vol - LAG(session_vol) OVER (PARTITION BY symbol ORDER BY exchange_ts, session_vol) AS vol_delta, quantity\n    FROM market_trade\n    WHERE exchange_ts >= (date_trunc('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh') AND session_vol IS NOT NULL\n  ) sub WHERE vol_delta > quantity * 3 AND quantity > 0) AS \"Vol Delta Anomaly\",\n  (SELECT COUNT(*)::double precision FROM order_book_l2 WHERE exchange_ts >= (date_trunc('day', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh') AND bid_price1 IS NOT NULL AND bid_price1 > 0 AND (spread < 0 OR spread > bid_price1 * 0.1) AND (exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::time NOT BETWEEN '08:45:00' AND '08:45:05' AND (exchange_ts AT TIME ZONE 'Asia/Ho_Chi_Minh')::time NOT BETWEEN '09:00:00' AND '09:00:05') AS \"Spread Anomaly\"",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "unit": "short",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "blue",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Anomaly giá"
+                        },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "color": "green",
+                                            "value": null
+                                        },
+                                        {
+                                            "color": "red",
+                                            "value": 1
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Vol Delta Anomaly"
+                        },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "color": "green",
+                                            "value": null
+                                        },
+                                        {
+                                            "color": "yellow",
+                                            "value": 1
+                                        },
+                                        {
+                                            "color": "red",
+                                            "value": 100
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Spread Anomaly"
+                        },
+                        "properties": [
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "color": "green",
+                                            "value": null
+                                        },
+                                        {
+                                            "color": "red",
+                                            "value": 1
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": true
+                },
+                "orientation": "horizontal",
+                "textMode": "value_and_name",
+                "colorMode": "background",
+                "text": {
+                    "titleSize": 14,
+                    "valueSize": 26
+                }
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 24,
+                "x": 0,
+                "y": 48
+            }
+        }
+    ]
 }

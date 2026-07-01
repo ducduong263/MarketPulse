@@ -66,25 +66,10 @@
     "version": 1,
     "panels": [
         {
-            "id": 1,
-            "type": "text",
-            "title": "ℹ️ Ghi chú",
-            "options": {
-                "mode": "markdown",
-                "content": "### Layer 1 — Ingestion Pipeline\nDashboard này dùng bảng `pipeline_stats` trong TimescaleDB.\n\n**Yêu cầu:** Chạy `init_db/04_monitoring.sql` và triển khai code metrics trong `producer_base.py` (Bước 1 & 2 của Implementation Plan).\n\nCác panel bên dưới sẽ hiển thị dữ liệu sau khi producers bắt đầu ghi metrics."
-            },
-            "gridPos": {
-                "h": 3,
-                "w": 24,
-                "x": 0,
-                "y": 0
-            }
-        },
-        {
             "id": 2,
             "type": "stat",
-            "title": "🟢 WebSocket Status (1=Connected, 0=Disconnected)",
-            "description": "Trạng thái kết nối WebSocket của từng producer. Äá» = disconnected.",
+            "title": "🟢 Trạng thái WebSocket (1=Connected, 0=Disconnected)",
+            "description": "Trạng thái kết nối WebSocket của từng producer. Đỏ = Disconnected.",
             "datasource": {
                 "type": "postgres",
                 "uid": "timescaledb"
@@ -162,8 +147,8 @@
         {
             "id": 3,
             "type": "stat",
-            "title": "🔄 Reconnect Count (kể từ khi start)",
-            "description": "Số lần WebSocket reconnect. Giá trị cao = kết nối không ổn định.",
+            "title": "🔄 Số lần Reconnect (kể từ khi start)",
+            "description": "Số lần WebSocket reconnect. Giá trị cao = Kết nối không ổn định.",
             "datasource": {
                 "type": "postgres",
                 "uid": "timescaledb"
@@ -231,7 +216,7 @@
         {
             "id": 4,
             "type": "timeseries",
-            "title": "📨 Messages/sec per Service",
+            "title": "📨 Message/sec theo Service",
             "datasource": {
                 "type": "postgres",
                 "uid": "timescaledb"
@@ -274,12 +259,13 @@
                 "w": 12,
                 "x": 0,
                 "y": 10
-            }
+            },
+            "description": "Số lượng message được xử lý mỗi giây bởi từng service."
         },
         {
             "id": 5,
             "type": "timeseries",
-            "title": "❌ Avro Serialize Error Count",
+            "title": "❌ Số lượng lỗi Serialize Avro",
             "datasource": {
                 "type": "postgres",
                 "uid": "timescaledb"
@@ -323,13 +309,14 @@
                 "w": 12,
                 "x": 12,
                 "y": 10
-            }
+            },
+            "description": "Số lượng lỗi trong quá trình serialize dữ liệu Avro."
         },
         {
             "id": 6,
             "type": "timeseries",
             "title": "📊 Kafka Consumer Lag (từ Prometheus)",
-            "description": "Consumer lag của các group timescaledb-*. Cao > 1000 = consumer bị quá tải.",
+            "description": "Consumer lag của các group timescaledb-*. Nếu lag > 1000 = Consumer bị quá tải.",
             "datasource": {
                 "type": "prometheus",
                 "uid": "prometheus"
@@ -394,8 +381,8 @@
         {
             "id": 7,
             "type": "state-timeline",
-            "title": "🔌 Connection Status per Service (Online / Offline)",
-            "description": "Dải xanh = Online, Äá» = Offline. Hover vào vùng Ä‘á» để xem thá»i gian bị mất kết nối. Mỗi láº§n restart container hoặc mất máº¡ng Ä‘á»u Ä‘Æ°á»£c ghi nhận.",
+            "title": "🔌 Trạng thái kết nối của Service (Online / Offline)",
+            "description": "Dải xanh = Online, Đỏ = Offline. Hover vào vùng đỏ để xem thời gian mất kết nối. Mỗi lần restart container hoặc mất mạng đều được ghi nhận.",
             "datasource": {
                 "type": "postgres",
                 "uid": "timescaledb"
@@ -483,20 +470,21 @@
         {
             "id": 8,
             "type": "row",
-            "title": "📋 Instrument Master — Danh mục mã đang Subscribe",
+            "title": "📋 Danh mục mã đang Subscribe (Instrument Master)",
             "collapsed": false,
             "gridPos": {
                 "h": 1,
                 "w": 24,
                 "x": 0,
                 "y": 34
-            }
+            },
+            "description": "Danh sách tổng hợp các mã chứng khoán."
         },
         {
             "id": 9,
             "type": "stat",
-            "title": "Mã Subscribe theo Sàn (dynamic filter)",
-            "description": "Số mã chứng khoán đang được subscribe, phân theo sàn. Bộ lọc (board_id, status, admin, sanction, market, indexes, groups) được tải động từ bảng pipeline_config trong DB.",
+            "title": "📊 Số lượng mã Subscribe theo Sàn (Dynamic Filter)",
+            "description": "Số lượng mã chứng khoán đang được subscribe, phân loại theo sàn. Bộ lọc (board_id, status, admin, sanction, market, indexes, groups) được tải động từ bảng pipeline_config.",
             "datasource": {
                 "type": "postgres",
                 "uid": "timescaledb"
@@ -507,7 +495,7 @@
                         "type": "postgres",
                         "uid": "timescaledb"
                     },
-                    "rawSql": "SELECT\n  CASE sd.market_id\n    WHEN 'STO' THEN 'HOSE'\n    WHEN 'STX' THEN 'HNX'\n    WHEN 'UPX' THEN 'UPCOM'\n    WHEN 'DVX' THEN 'Phai sinh'\n    WHEN 'HCX' THEN 'CW'\n    ELSE sd.market_id\n  END AS metric,\n  COUNT(DISTINCT sd.symbol) AS value\nFROM security_definition sd\nJOIN instrument_master im\n  ON sd.symbol = im.symbol AND sd.market_id = im.market_id\nWHERE sd.trading_date = CURRENT_DATE\n  AND sd.board_id = (SELECT value FROM pipeline_config WHERE key = 'symbol_filter_board_id')\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_status'), '') = ''\n    OR sd.security_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_status'), ','))\n  )\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_admin'), '') = ''\n    OR sd.admin_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_admin'), ','))\n  )\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_sanction'), '') = ''\n    OR sd.trading_sanction_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_sanction'), ','))\n  )\n  AND im.is_active = true\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_market'), '') = ''\n    OR sd.market_id = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_market'), ','))\n  )\n  AND (\n    (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), '') = ''\n      AND COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), '') = ''\n    )\n    OR (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), '') <> ''\n      AND string_to_array(im.index_name, ',') && string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), ',')\n    )\n    OR (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), '') <> ''\n      AND im.security_group_id = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), ','))\n    )\n  )\nGROUP BY sd.market_id\nORDER BY metric",
+                    "rawSql": "SELECT\n  CASE sd.market_id\n    WHEN 'STO' THEN 'Cổ phiếu sàn HOSE'\n    WHEN 'STX' THEN 'Cổ phiếu sàn HNX'\n    WHEN 'UPX' THEN 'Cổ phiếu sàn Upcom'\n    WHEN 'DVX' THEN 'Phái sinh sàn HNX'\n    WHEN 'HCX' THEN 'Trái phiếu doanh nghiệp sàn HNX'\n    ELSE 'Không xác định'\n  END AS metric,\n  COUNT(DISTINCT sd.symbol) AS value\nFROM security_definition sd\nJOIN instrument_master im\n  ON sd.symbol = im.symbol AND sd.market_id = im.market_id\nWHERE sd.trading_date = CURRENT_DATE\n  AND sd.board_id = (SELECT value FROM pipeline_config WHERE key = 'symbol_filter_board_id')\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_status'), '') = ''\n    OR sd.security_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_status'), ','))\n  )\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_admin'), '') = ''\n    OR sd.admin_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_admin'), ','))\n  )\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_sanction'), '') = ''\n    OR sd.trading_sanction_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_sanction'), ','))\n  )\n  AND im.is_active = true\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_market'), '') = ''\n    OR sd.market_id = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_market'), ','))\n  )\n  AND (\n    (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), '') = ''\n      AND COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), '') = ''\n    )\n    OR (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), '') <> ''\n      AND string_to_array(im.index_name, ',') && string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), ',')\n    )\n    OR (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), '') <> ''\n      AND im.security_group_id = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), ','))\n    )\n  )\nGROUP BY sd.market_id\nORDER BY metric",
                     "format": "table",
                     "refId": "A"
                 }
@@ -550,17 +538,17 @@
                 "graphMode": "none"
             },
             "gridPos": {
-                "h": 5,
-                "w": 14,
+                "h": 7,
+                "w": 7,
                 "x": 0,
                 "y": 35
             }
         },
         {
             "id": 10,
-            "type": "stat",
-            "title": "🔢 Tổng mã Subscribe",
-            "description": "Tổng số mã đang được subscribe với bộ lọc động từ bảng pipeline_config trong DB.",
+            "type": "table",
+            "title": "📋 Chi tiết mã đang Subscribe (Dynamic Filter)",
+            "description": "Danh sách chi tiết các mã chứng khoán đang được subscribe theo cấu hình bộ lọc động trong Database.",
             "datasource": {
                 "type": "postgres",
                 "uid": "timescaledb"
@@ -571,131 +559,64 @@
                         "type": "postgres",
                         "uid": "timescaledb"
                     },
-                    "rawSql": "SELECT\n  COUNT(DISTINCT sd.symbol) AS value\nFROM security_definition sd\nJOIN instrument_master im\n  ON sd.symbol = im.symbol AND sd.market_id = im.market_id\nWHERE sd.trading_date = CURRENT_DATE\n  AND sd.board_id = (SELECT value FROM pipeline_config WHERE key = 'symbol_filter_board_id')\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_status'), '') = ''\n    OR sd.security_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_status'), ','))\n  )\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_admin'), '') = ''\n    OR sd.admin_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_admin'), ','))\n  )\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_sanction'), '') = ''\n    OR sd.trading_sanction_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_sanction'), ','))\n  )\n  AND im.is_active = true\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_market'), '') = ''\n    OR sd.market_id = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_market'), ','))\n  )\n  AND (\n    (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), '') = ''\n      AND COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), '') = ''\n    )\n    OR (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), '') <> ''\n      AND string_to_array(im.index_name, ',') && string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), ',')\n    )\n    OR (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), '') <> ''\n      AND im.security_group_id = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), ','))\n    )\n  )",
+                    "rawSql": "SELECT\n  sd.symbol AS \"Mã\",\n  CASE sd.market_id\n    WHEN 'STO' THEN 'Cổ phiếu sàn HOSE'\n    WHEN 'STX' THEN 'Cổ phiếu sàn HNX'\n    WHEN 'UPX' THEN 'Cổ phiếu sàn Upcom'\n    WHEN 'DVX' THEN 'Phái sinh sàn HNX'\n    WHEN 'HCX' THEN 'Trái phiếu doanh nghiệp sàn HNX'\n    ELSE 'Không xác định'\n  END AS \"Sàn\",\n  im.short_name AS \"Tên mã\"\nFROM security_definition sd\nJOIN instrument_master im\n  ON sd.symbol = im.symbol AND sd.market_id = im.market_id\nWHERE sd.trading_date = CURRENT_DATE\n  AND sd.board_id = (SELECT value FROM pipeline_config WHERE key = 'symbol_filter_board_id')\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_status'), '') = ''\n    OR sd.security_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_status'), ','))\n  )\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_admin'), '') = ''\n    OR sd.admin_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_admin'), ','))\n  )\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_sanction'), '') = ''\n    OR sd.trading_sanction_status = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_sanction'), ','))\n  )\n  AND im.is_active = true\n  AND (\n    COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_market'), '') = ''\n    OR sd.market_id = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_market'), ','))\n  )\n  AND (\n    (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), '') = ''\n      AND COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), '') = ''\n    )\n    OR (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), '') <> ''\n      AND string_to_array(im.index_name, ',') && string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_indexes'), ',')\n    )\n    OR (\n      COALESCE((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), '') <> ''\n      AND im.security_group_id = ANY(string_to_array((SELECT value FROM pipeline_config WHERE key = 'symbol_filter_groups'), ','))\n    )\n  )\nORDER BY \"Sàn\", sd.symbol\nLIMIT 100",
                     "format": "table",
                     "refId": "A"
                 }
             ],
             "fieldConfig": {
                 "defaults": {
-                    "color": {
-                        "mode": "fixed",
-                        "fixedColor": "green"
-                    },
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
+                    "custom": {
+                        "align": "left",
+                        "displayMode": "auto"
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Mã"
+                        },
+                        "properties": [
                             {
-                                "color": "green",
-                                "value": null
+                                "id": "custom.width",
+                                "value": 100
                             }
                         ]
                     },
-                    "unit": "short",
-                    "mappings": []
-                },
-                "overrides": []
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Sàn"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 240
+                            }
+                        ]
+                    }
+                ]
             },
             "options": {
-                "reduceOptions": {
-                    "calcs": [
-                        "lastNotNull"
-                    ],
-                    "fields": "/^value$/",
-                    "values": false
+                "footer": {
+                    "show": false
                 },
-                "orientation": "auto",
-                "textMode": "value_and_name",
-                "colorMode": "background",
-                "text": {
-                    "titleSize": 14,
-                    "valueSize": 36
-                },
-                "graphMode": "none"
+                "showHeader": true,
+                "cellHeight": "sm"
             },
             "gridPos": {
-                "h": 5,
-                "w": 4,
-                "x": 14,
+                "h": 7,
+                "w": 8,
+                "x": 7,
                 "y": 35
             }
         },
         {
             "id": 11,
-            "type": "stat",
-            "title": "📅 Mã đáo hạn trong 7 ngày tới",
-            "description": "Số mã phái sinh/chứng quyền (is_active=true) sẽ đến hạn trong 7 ngày kế tiếp (không tính hôm nay). Nếu > 0 cần theo dõi để xử lý sau khi deactivate.",
-            "datasource": {
-                "type": "postgres",
-                "uid": "timescaledb"
-            },
-            "targets": [
-                {
-                    "datasource": {
-                        "type": "postgres",
-                        "uid": "timescaledb"
-                    },
-                    "rawSql": "SELECT\n  COUNT(DISTINCT sd.symbol) AS value\nFROM security_definition sd\nJOIN instrument_master im\n  ON sd.symbol = im.symbol AND sd.market_id = im.market_id\nWHERE sd.trading_date = CURRENT_DATE\n  AND sd.final_trade_date > CURRENT_DATE\n  AND sd.final_trade_date <= CURRENT_DATE + INTERVAL '7 days'\n  AND im.is_active = true",
-                    "format": "table",
-                    "refId": "A"
-                }
-            ],
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    },
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "color": "green",
-                                "value": null
-                            },
-                            {
-                                "color": "yellow",
-                                "value": 1
-                            },
-                            {
-                                "color": "orange",
-                                "value": 10
-                            }
-                        ]
-                    },
-                    "unit": "short",
-                    "mappings": []
-                },
-                "overrides": []
-            },
-            "options": {
-                "reduceOptions": {
-                    "calcs": [
-                        "lastNotNull"
-                    ],
-                    "fields": "/^value$/",
-                    "values": false
-                },
-                "orientation": "auto",
-                "textMode": "value_and_name",
-                "colorMode": "background",
-                "text": {
-                    "titleSize": 13,
-                    "valueSize": 36
-                },
-                "graphMode": "none"
-            },
-            "gridPos": {
-                "h": 5,
-                "w": 6,
-                "x": 18,
-                "y": 35
-            }
-        },
-        {
-            "id": 12,
             "type": "table",
             "title": "📋 Chi tiết mã sắp đáo hạn (14 ngày tới)",
-            "description": "Danh sách các mã phái sinh/chứng quyền đang active và sẽ đáo hạn trong 14 ngày tới, sorted theo ngày đáo hạn gần nhất.",
+            "description": "Danh sách các mã phái sinh / chứng quyền đang active và sẽ đáo hạn trong 14 ngày tới, sắp xếp theo ngày đáo hạn gần nhất.",
             "datasource": {
                 "type": "postgres",
                 "uid": "timescaledb"
@@ -706,7 +627,7 @@
                         "type": "postgres",
                         "uid": "timescaledb"
                     },
-                    "rawSql": "SELECT\n  sd.symbol                        AS \"Symbol\",\n  CASE sd.market_id\n    WHEN 'STO' THEN 'HOSE'\n    WHEN 'DVX' THEN 'Phai sinh'\n    WHEN 'HCX' THEN 'CW'\n    ELSE sd.market_id\n  END                              AS \"San\",\n  sd.security_group_id             AS \"Loai\",\n  sd.final_trade_date              AS \"Ngay dao han\",\n  (sd.final_trade_date - CURRENT_DATE) AS \"Con lai (ngay)\"\nFROM security_definition sd\nJOIN instrument_master im\n  ON sd.symbol = im.symbol AND sd.market_id = im.market_id\nWHERE sd.trading_date = CURRENT_DATE\n  AND sd.final_trade_date IS NOT NULL\n  AND sd.final_trade_date > CURRENT_DATE\n  AND sd.final_trade_date <= CURRENT_DATE + INTERVAL '14 days'\n  AND im.is_active = true\nORDER BY sd.final_trade_date, sd.symbol",
+                    "rawSql": "SELECT\n  sd.symbol                        AS \"Mã\",\n  CASE sd.security_group_id\n    WHEN 'ST' THEN 'Cổ phiếu'\n    WHEN 'EW' THEN 'Chứng quyền'\n    WHEN 'FU' THEN 'Hợp đồng tương lai'\n    WHEN 'EF' THEN 'Quỹ ETF'\n    WHEN 'BS' THEN 'Trái phiếu doanh nghiệp'\n    WHEN 'SR' THEN 'Quyền mua'\n    ELSE 'Không xác định'\n  END                              AS \"Định danh\",\n  sd.final_trade_date              AS \"Ngày đáo hạn\",\n  (sd.final_trade_date - CURRENT_DATE) AS \"Còn lại (ngày)\"\nFROM security_definition sd\nJOIN instrument_master im\n  ON sd.symbol = im.symbol AND sd.market_id = im.market_id\nWHERE sd.trading_date = CURRENT_DATE\n  AND sd.final_trade_date IS NOT NULL\n  AND sd.final_trade_date > CURRENT_DATE\n  AND sd.final_trade_date <= CURRENT_DATE + INTERVAL '14 days'\n  AND im.is_active = true\nORDER BY sd.final_trade_date, sd.symbol",
                     "format": "table",
                     "refId": "A"
                 }
@@ -749,12 +670,12 @@
                     {
                         "matcher": {
                             "id": "byName",
-                            "options": "Symbol"
+                            "options": "Mã"
                         },
                         "properties": [
                             {
                                 "id": "custom.width",
-                                "value": 120
+                                "value": 130
                             },
                             {
                                 "id": "custom.cellOptions",
@@ -767,12 +688,12 @@
                     {
                         "matcher": {
                             "id": "byName",
-                            "options": "San"
+                            "options": "Định danh"
                         },
                         "properties": [
                             {
                                 "id": "custom.width",
-                                "value": 100
+                                "value": 150
                             },
                             {
                                 "id": "custom.cellOptions",
@@ -785,30 +706,12 @@
                     {
                         "matcher": {
                             "id": "byName",
-                            "options": "Loai"
+                            "options": "Ngày đáo hạn"
                         },
                         "properties": [
                             {
                                 "id": "custom.width",
-                                "value": 80
-                            },
-                            {
-                                "id": "custom.cellOptions",
-                                "value": {
-                                    "type": "auto"
-                                }
-                            }
-                        ]
-                    },
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "Ngay dao han"
-                        },
-                        "properties": [
-                            {
-                                "id": "custom.width",
-                                "value": 140
+                                "value": 160
                             },
                             {
                                 "id": "custom.cellOptions",
@@ -825,7 +728,7 @@
                     {
                         "matcher": {
                             "id": "byName",
-                            "options": "Con lai (ngay)"
+                            "options": "Còn lại (ngày)"
                         },
                         "properties": [
                             {
@@ -870,7 +773,7 @@
             "options": {
                 "sortBy": [
                     {
-                        "displayName": "Con lai (ngay)",
+                        "displayName": "Còn lại (ngày)",
                         "desc": false
                     }
                 ],
@@ -882,9 +785,9 @@
             },
             "gridPos": {
                 "h": 7,
-                "w": 24,
-                "x": 0,
-                "y": 40
+                "w": 9,
+                "x": 15,
+                "y": 35
             }
         }
     ]

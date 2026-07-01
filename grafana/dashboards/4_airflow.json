@@ -1,526 +1,561 @@
 {
-  "annotations": {
-    "list": []
-  },
-  "editable": true,
-  "graphTooltip": 1,
-  "id": null,
-  "links": [
-    { "title": "Overview", "type": "dashboard", "url": "/d/mp-overview", "icon": "external link", "tooltip": "System status overview", "targetBlank": false },
-    { "title": "Layer 1 — Ingestion", "type": "dashboard", "url": "/d/mp-ingestion", "icon": "external link", "tooltip": "WebSocket status, reconnects, throughput", "targetBlank": false },
-    { "title": "Layer 2 — Kafka", "type": "dashboard", "url": "/d/mp-kafka", "icon": "external link", "tooltip": "Consumer lag, messages/sec, offsets", "targetBlank": false },
-    { "title": "Layer 3 — Storage", "type": "dashboard", "url": "/d/mp-storage", "icon": "external link", "tooltip": "Data freshness, latency, compression, disk", "targetBlank": false },
-    { "title": "Layer 5 — Data Quality", "type": "dashboard", "url": "/d/mp-data-quality", "icon": "external link", "tooltip": "Gap detector, price anomaly, stale data", "targetBlank": false }
-  ],
-  "refresh": "60s",
-  "schemaVersion": 39,
-  "tags": [
-    "marketpulse"
-  ],
-  "templating": {
-    "list": []
-  },
-  "time": {
-    "from": "now-24h",
-    "to": "now"
-  },
-  "timepicker": {},
-  "timezone": "Asia/Ho_Chi_Minh",
-  "title": "Layer 4 — Airflow Orchestration",
-  "uid": "mp-airflow",
-  "version": 1,
-  "panels": [
-    {
-      "id": 1,
-      "type": "table",
-      "title": "📋 DAG Run Status — 24 giờ qua",
-      "description": "Trạng thái các lần chạy DAG. Màu đỏ = failed. Chú ý dag_secdef_sync phải success mỗi sáng.",
-      "datasource": {
-        "type": "postgres",
-        "uid": "airflow-pg"
-      },
-      "targets": [
+    "annotations": {
+        "list": []
+    },
+    "editable": true,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [
         {
-          "datasource": {
-            "type": "postgres",
-            "uid": "airflow-pg"
-          },
-          "rawSql": "SELECT dag_id AS \"DAG\", state AS \"Trạng thái\", COUNT(*) AS \"Số lần\", MAX(end_date) AS \"Lần cuối\", ROUND(AVG(EXTRACT(EPOCH FROM (end_date - start_date)))::numeric, 1) AS \"Thời gian TB (s)\" FROM dag_run WHERE start_date > NOW() - INTERVAL '24 hours' AND state != 'running' GROUP BY dag_id, state ORDER BY dag_id, state",
-          "format": "table",
-          "refId": "A"
+            "title": "Overview",
+            "type": "dashboard",
+            "url": "/d/mp-overview",
+            "icon": "external link",
+            "tooltip": "System status overview",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 1 — Ingestion",
+            "type": "dashboard",
+            "url": "/d/mp-ingestion",
+            "icon": "external link",
+            "tooltip": "WebSocket status, reconnects, throughput",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 2 — Kafka",
+            "type": "dashboard",
+            "url": "/d/mp-kafka",
+            "icon": "external link",
+            "tooltip": "Consumer lag, messages/sec, offsets",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 3 — Storage",
+            "type": "dashboard",
+            "url": "/d/mp-storage",
+            "icon": "external link",
+            "tooltip": "Data freshness, latency, compression, disk",
+            "targetBlank": false
+        },
+        {
+            "title": "Layer 5 — Data Quality",
+            "type": "dashboard",
+            "url": "/d/mp-data-quality",
+            "icon": "external link",
+            "tooltip": "Gap detector, price anomaly, stale data",
+            "targetBlank": false
         }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Trạng thái"
+    ],
+    "refresh": "60s",
+    "schemaVersion": 39,
+    "tags": [
+        "marketpulse"
+    ],
+    "templating": {
+        "list": []
+    },
+    "time": {
+        "from": "now-24h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "Asia/Ho_Chi_Minh",
+    "title": "Layer 4 — Airflow Orchestration",
+    "uid": "mp-airflow",
+    "version": 1,
+    "panels": [
+        {
+            "id": 1,
+            "type": "table",
+            "title": "📋 Trạng thái DAG Run — 24 giờ qua",
+            "description": "Trạng thái các lần chạy DAG. Màu đỏ = failed. Chú ý dag_secdef_sync phải success mỗi sáng.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "airflow-pg"
             },
-            "properties": [
-              {
-                "id": "custom.displayMode",
-                "value": "color-background"
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "success": {
-                        "text": "✅ success",
-                        "color": "green"
-                      },
-                      "failed": {
-                        "text": "❌ failed",
-                        "color": "red"
-                      },
-                      "skipped": {
-                        "text": "⏭ skipped",
-                        "color": "blue"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Lần cuối"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "dateTimeAsIso"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Thời gian TB (s)"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "s"
-              },
-              {
-                "id": "custom.displayMode",
-                "value": "color-background"
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "airflow-pg"
                     },
-                    {
-                      "color": "yellow",
-                      "value": 300
-                    },
-                    {
-                      "color": "red",
-                      "value": 3600
-                    }
-                  ]
+                    "rawSql": "SELECT dag_id AS \"DAG\", state AS \"Trạng thái\", COUNT(*) AS \"Số lần\", MAX(end_date) AS \"Lần cuối\", ROUND(AVG(EXTRACT(EPOCH FROM (end_date - start_date)))::numeric, 1) AS \"Thời gian TB (s)\" FROM dag_run WHERE start_date > NOW() - INTERVAL '24 hours' AND state != 'running' GROUP BY dag_id, state ORDER BY dag_id, state",
+                    "format": "table",
+                    "refId": "A"
                 }
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "sortBy": [
-          {
-            "displayName": "Lần cuối",
-            "desc": true
-          }
-        ],
-        "footer": {
-          "show": false
-        },
-        "showHeader": true
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      }
-    },
-    {
-      "id": 2,
-      "type": "table",
-      "title": "⏱ Task Duration — Chi tiết từng task (7 ngày qua)",
-      "description": "Theo dõi task dag_compact_bronze. Nếu > 60 phút cần tối ưu tài nguyên.",
-      "datasource": {
-        "type": "postgres",
-        "uid": "airflow-pg"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "airflow-pg"
-          },
-          "rawSql": "SELECT dag_id AS \"DAG\", task_id AS \"Task\", state AS \"Trạng thái\", COUNT(*) AS \"Số lần\", ROUND(AVG(EXTRACT(EPOCH FROM (end_date - start_date)))::numeric / 60, 2) AS \"TB (phút)\", ROUND(MAX(EXTRACT(EPOCH FROM (end_date - start_date)))::numeric / 60, 2) AS \"Max (phút)\" FROM task_instance WHERE start_date > NOW() - INTERVAL '7 days' AND state IN ('success', 'failed') GROUP BY dag_id, task_id, state ORDER BY dag_id, task_id",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Max (phút)"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "m"
-              },
-              {
-                "id": "custom.displayMode",
-                "value": "color-background"
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
+            ],
+            "fieldConfig": {
+                "defaults": {},
+                "overrides": [
                     {
-                      "color": "green",
-                      "value": null
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Trạng thái"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-background"
+                            },
+                            {
+                                "id": "mappings",
+                                "value": [
+                                    {
+                                        "type": "value",
+                                        "options": {
+                                            "success": {
+                                                "text": "✅ success",
+                                                "color": "green"
+                                            },
+                                            "failed": {
+                                                "text": "❌ failed",
+                                                "color": "red"
+                                            },
+                                            "skipped": {
+                                                "text": "⏭ skipped",
+                                                "color": "blue"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
                     },
                     {
-                      "color": "yellow",
-                      "value": 30
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Lần cuối"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "dateTimeAsIso"
+                            }
+                        ]
                     },
                     {
-                      "color": "red",
-                      "value": 60
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Thời gian TB (s)"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "s"
+                            },
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-background"
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "color": "green",
+                                            "value": null
+                                        },
+                                        {
+                                            "color": "yellow",
+                                            "value": 300
+                                        },
+                                        {
+                                            "color": "red",
+                                            "value": 3600
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
                     }
-                  ]
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Trạng thái"
-            },
-            "properties": [
-              {
-                "id": "custom.displayMode",
-                "value": "color-background"
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "success": {
-                        "text": "✅",
-                        "color": "green"
-                      },
-                      "failed": {
-                        "text": "❌",
-                        "color": "red"
-                      }
-                    }
-                  }
                 ]
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "sortBy": [
-          {
-            "displayName": "Max (phút)",
-            "desc": true
-          }
-        ],
-        "footer": {
-          "show": false
-        },
-        "showHeader": true
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 10
-      }
-    },
-    {
-      "id": 3,
-      "type": "timeseries",
-      "title": "📈 DAG Run Timeline — Thời gian thực thi theo ngày",
-      "description": "Trend thời gian chạy của các DAG quan trọng. Tăng đột biến = có vấn đề về hiệu suất.",
-      "datasource": {
-        "type": "postgres",
-        "uid": "airflow-pg"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "airflow-pg"
-          },
-          "rawSql": "SELECT date_trunc('hour', start_date) AS time, dag_id AS metric, AVG(EXTRACT(EPOCH FROM (end_date - start_date))) AS value FROM dag_run WHERE $__timeFilter(start_date) AND state = 'success' GROUP BY 1, 2 ORDER BY 1",
-          "format": "time_series",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 5
-          },
-          "unit": "s"
-        }
-      },
-      "options": {
-        "tooltip": {
-          "mode": "multi"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 20
-      }
-    },
-    {
-      "id": 4,
-      "type": "stat",
-      "title": "🏛️ Active Symbols trong instrument_master",
-      "description": "Số mã đang active. Nếu đột ngột giảm mạnh → bug deactivation hàng loạt.",
-      "datasource": {
-        "type": "postgres",
-        "uid": "timescaledb"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "timescaledb"
-          },
-          "rawSql": "SELECT COUNT(*) AS value FROM instrument_master WHERE is_active = true",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 100
-              },
-              {
-                "color": "green",
-                "value": 200
-              }
-            ]
-          },
-          "unit": "none",
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/^value$/",
-          "values": false
-        },
-        "orientation": "auto",
-        "textMode": "value_and_name",
-        "colorMode": "background"
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 0,
-        "y": 28
-      }
-    },
-    {
-      "id": 5,
-      "type": "stat",
-      "title": "📅 Security Definition (Hôm Nay)",
-      "description": "Số record trong security_definition hôm nay. < 200 = dag_sync_secdef chưa chạy hoặc API trả về rỗng.",
-      "datasource": {
-        "type": "postgres",
-        "uid": "timescaledb"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "timescaledb"
-          },
-          "rawSql": "SELECT COUNT(*) AS value FROM security_definition WHERE trading_date = (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 100
-              },
-              {
-                "color": "green",
-                "value": 200
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/^value$/",
-          "values": false
-        },
-        "orientation": "auto",
-        "textMode": "value_and_name",
-        "colorMode": "background"
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 8,
-        "y": 28
-      }
-    },
-    {
-      "id": 6,
-      "type": "stat",
-      "title": "📅 DAG dag_secdef_sync — Hôm Nay",
-      "description": "Số lần dag_secdef_sync chạy thành công hôm nay. Phải = 1 vào mỗi sáng.",
-      "datasource": {
-        "type": "postgres",
-        "uid": "airflow-pg"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "airflow-pg"
-          },
-          "rawSql": "SELECT COUNT(*) AS value FROM dag_run WHERE dag_id = 'dag_secdef_sync' AND state = 'success' AND (start_date AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "unit": "short",
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "❌ Chưa chạy",
-                  "color": "red"
+            },
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "Lần cuối",
+                        "desc": true
+                    }
+                ],
+                "footer": {
+                    "show": false
                 },
-                "1": {
-                  "text": "✅ Đã chạy",
-                  "color": "green"
-                }
-              }
+                "showHeader": true
+            },
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 0
             }
-          ]
         },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/^value$/",
-          "values": false
+        {
+            "id": 2,
+            "type": "table",
+            "title": "⏱ Task Duration — Chi tiết từng task (7 ngày qua)",
+            "description": "Theo dõi task dag_compact_bronze. Nếu > 60 phút cần tối ưu tài nguyên.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "airflow-pg"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "airflow-pg"
+                    },
+                    "rawSql": "SELECT dag_id AS \"DAG\", task_id AS \"Task\", state AS \"Trạng thái\", COUNT(*) AS \"Số lần\", ROUND(AVG(EXTRACT(EPOCH FROM (end_date - start_date)))::numeric / 60, 2) AS \"TB (phút)\", ROUND(MAX(EXTRACT(EPOCH FROM (end_date - start_date)))::numeric / 60, 2) AS \"Max (phút)\" FROM task_instance WHERE start_date > NOW() - INTERVAL '7 days' AND state IN ('success', 'failed') GROUP BY dag_id, task_id, state ORDER BY dag_id, task_id",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {},
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Max (phút)"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "m"
+                            },
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-background"
+                            },
+                            {
+                                "id": "thresholds",
+                                "value": {
+                                    "mode": "absolute",
+                                    "steps": [
+                                        {
+                                            "color": "green",
+                                            "value": null
+                                        },
+                                        {
+                                            "color": "yellow",
+                                            "value": 30
+                                        },
+                                        {
+                                            "color": "red",
+                                            "value": 60
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Trạng thái"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.displayMode",
+                                "value": "color-background"
+                            },
+                            {
+                                "id": "mappings",
+                                "value": [
+                                    {
+                                        "type": "value",
+                                        "options": {
+                                            "success": {
+                                                "text": "✅",
+                                                "color": "green"
+                                            },
+                                            "failed": {
+                                                "text": "❌",
+                                                "color": "red"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            "options": {
+                "sortBy": [
+                    {
+                        "displayName": "Max (phút)",
+                        "desc": true
+                    }
+                ],
+                "footer": {
+                    "show": false
+                },
+                "showHeader": true
+            },
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 10
+            }
         },
-        "orientation": "auto",
-        "textMode": "value_and_name",
-        "colorMode": "background"
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 16,
-        "y": 28
-      }
-    }
-  ]
+        {
+            "id": 3,
+            "type": "timeseries",
+            "title": "📈 DAG Run Timeline — Thời gian thực thi theo ngày",
+            "description": "Trend thời gian chạy của các DAG quan trọng. Tăng đột biến = có vấn đề về hiệu suất.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "airflow-pg"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "airflow-pg"
+                    },
+                    "rawSql": "SELECT date_trunc('hour', start_date) AS time, dag_id AS metric, AVG(EXTRACT(EPOCH FROM (end_date - start_date))) AS value FROM dag_run WHERE $__timeFilter(start_date) AND state = 'success' GROUP BY 1, 2 ORDER BY 1",
+                    "format": "time_series",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "lineWidth": 2,
+                        "fillOpacity": 5
+                    },
+                    "unit": "s"
+                }
+            },
+            "options": {
+                "tooltip": {
+                    "mode": "multi"
+                },
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 20
+            }
+        },
+        {
+            "id": 4,
+            "type": "stat",
+            "title": "🏛️ Các mã Active trong instrument_master",
+            "description": "Số mã đang active. Nếu đột ngột giảm mạnh → bug deactivation hàng loạt.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT COUNT(*) AS value FROM instrument_master WHERE is_active = true",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 100
+                            },
+                            {
+                                "color": "green",
+                                "value": 200
+                            }
+                        ]
+                    },
+                    "unit": "none",
+                    "mappings": []
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^value$/",
+                    "values": false
+                },
+                "orientation": "auto",
+                "textMode": "value_and_name",
+                "colorMode": "background"
+            },
+            "gridPos": {
+                "h": 5,
+                "w": 8,
+                "x": 0,
+                "y": 28
+            }
+        },
+        {
+            "id": 5,
+            "type": "stat",
+            "title": "📅 Tình trạng bảng Security Definition (Hôm Nay)",
+            "description": "Số record trong security_definition hôm nay. < 200 = dag_sync_secdef chưa chạy hoặc API trả về rỗng.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "timescaledb"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "timescaledb"
+                    },
+                    "rawSql": "SELECT COUNT(*) AS value FROM security_definition WHERE trading_date = (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 100
+                            },
+                            {
+                                "color": "green",
+                                "value": 200
+                            }
+                        ]
+                    },
+                    "unit": "none"
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^value$/",
+                    "values": false
+                },
+                "orientation": "auto",
+                "textMode": "value_and_name",
+                "colorMode": "background"
+            },
+            "gridPos": {
+                "h": 5,
+                "w": 8,
+                "x": 8,
+                "y": 28
+            }
+        },
+        {
+            "id": 6,
+            "type": "stat",
+            "title": "📅 Trạng thái DAG dag_secdef_sync (Hôm Nay)",
+            "description": "Số lần dag_secdef_sync chạy thành công hôm nay. Phải = 1 vào mỗi sáng.",
+            "datasource": {
+                "type": "postgres",
+                "uid": "airflow-pg"
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "airflow-pg"
+                    },
+                    "rawSql": "SELECT COUNT(*) AS value FROM dag_run WHERE dag_id = 'dag_secdef_sync' AND state = 'success' AND (start_date AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date",
+                    "format": "table",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "green",
+                                "value": 1
+                            }
+                        ]
+                    },
+                    "unit": "short",
+                    "mappings": [
+                        {
+                            "type": "value",
+                            "options": {
+                                "0": {
+                                    "text": "❌ Chưa chạy",
+                                    "color": "red"
+                                },
+                                "1": {
+                                    "text": "✅ Đã chạy",
+                                    "color": "green"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^value$/",
+                    "values": false
+                },
+                "orientation": "auto",
+                "textMode": "value_and_name",
+                "colorMode": "background"
+            },
+            "gridPos": {
+                "h": 5,
+                "w": 8,
+                "x": 16,
+                "y": 28
+            }
+        }
+    ]
 }
