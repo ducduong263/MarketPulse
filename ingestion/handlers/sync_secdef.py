@@ -46,7 +46,7 @@ FLUSH_INTERVAL = 10.0
 # Priority group to subscribe via WSS (HOSE + HNX + Derivatives)
 # UPCOM (UPX) and HCX will be fetched via REST API in export_secdef.py
 WSS_PRIORITY_MARKETS = ("STO", "STX", "DVX")
-WSS_MAX_SYMBOLS = 1950  # Hard limit: 2000 channels; keep 50 buffer to prevent errors
+WSS_MAX_SYMBOLS = 1950  # Hard limit: 2000 channels globally for normalUser tier. Keep <= 1950.
 
 # ── SQL ───────────────────────────────────────────────────────────
 UPSERT_SQL = """
@@ -136,7 +136,7 @@ def _get_priority_symbols(conn) -> list[str]:
     Get the list of priority symbols from instrument_master:
     - STO (HOSE), STX (HNX), DVX (Derivatives) markets
     - Not expired yet: final_trade_date >= today OR NULL
-    - Limited by WSS_MAX_SYMBOLS to prevent MAX_CHANNELS_EXCEEDED errors
+    - Limited by WSS_MAX_SYMBOLS to prevent MAX_CHANNELS_EXCEEDED (Global limit = 2000 for normalUser)
     """
     markets_ph = ",".join(["%s"] * len(WSS_PRIORITY_MARKETS))
     sql = f"""
@@ -199,15 +199,8 @@ async def main(timeout: int | None):
         key = (sd.symbol, sd.marketId, sd.boardId)
         pending[key] = _sd_to_row(sd)
         stats["received"] += 1
-        if stats["received"] % 100 == 0:
+        if stats["received"] % 500 == 0:
             print(f"[INFO] Received: {stats['received']} | Pending: {len(pending)}")
-
-    client = TradingClient(
-        api_key=DNSE_API_KEY,
-        api_secret=DNSE_API_SECRET,
-        base_url=DNSE_WS_URL,
-        encoding="msgpack",
-    )
 
     print(f"[START] SecDef Sync -> PostgreSQL ({DB_HOST}:{DB_PORT}/{DB_NAME})")
     print(f"[CONFIG] Timeout: {'indefinite' if timeout is None else f'{timeout}s'} | Flush every: {FLUSH_INTERVAL}s")
@@ -220,22 +213,36 @@ async def main(timeout: int | None):
         conn.close()
         return
 
-    await client.connect()
-    print("[SUCCESS] Connected to DNSE WebSocket!")
-
-    # Subscribe in batches to prevent MAX_CHANNELS_EXCEEDED server error
+    # Create multiple WSS clients to bypass max channels per connection limit (1000)
+    MAX_SYMBOLS_PER_CLIENT = 900
     BATCH_SIZE = 300
-    for i in range(0, len(priority_symbols), BATCH_SIZE):
-        batch = priority_symbols[i : i + BATCH_SIZE]
-        await client.subscribe_sec_def(
-            symbols=batch,
-            on_sec_def=handle_secdef,
+    clients = []
+
+    for chunk_i in range(0, len(priority_symbols), MAX_SYMBOLS_PER_CLIENT):
+        chunk = priority_symbols[chunk_i : chunk_i + MAX_SYMBOLS_PER_CLIENT]
+        client_idx = (chunk_i // MAX_SYMBOLS_PER_CLIENT) + 1
+        
+        client = TradingClient(
+            api_key=DNSE_API_KEY,
+            api_secret=DNSE_API_SECRET,
+            base_url=DNSE_WS_URL,
             encoding="msgpack",
-            board_id="G1",
         )
-        print(f"[SUBSCRIBED] Batch {i // BATCH_SIZE + 1}: {len(batch)} symbols "
-              f"(total so far: {min(i + BATCH_SIZE, len(priority_symbols))}/{len(priority_symbols)})")
-    print(f"[SUBSCRIBED] Done subscribing {len(priority_symbols)} priority symbols. Listening...")
+        await client.connect()
+        clients.append(client)
+        print(f"[SUCCESS] Client {client_idx} connected!")
+
+        for i in range(0, len(chunk), BATCH_SIZE):
+            batch = chunk[i : i + BATCH_SIZE]
+            await client.subscribe_sec_def(
+                symbols=batch,
+                on_sec_def=handle_secdef,
+                encoding="msgpack",
+                board_id="G1",
+            )
+        print(f"[SUBSCRIBED] Client {client_idx} subscribed to {len(chunk)} symbols.")
+        
+    print(f"[SUBSCRIBED] Done all {len(clients)} clients for {len(priority_symbols)} symbols. Listening...")
 
     deadline = (time.monotonic() + timeout) if timeout else None
 
@@ -262,7 +269,8 @@ async def main(timeout: int | None):
             print(f"[FINAL FLUSH] {len(pending)} remaining records...")
             _flush(conn, pending, stats)
 
-        await client.disconnect()
+        for c in clients:
+            await c.disconnect()
         conn.close()
         print(f"\n[DONE] Total received: {stats['received']} | Upserted to DB: {stats['upserted']}")
 

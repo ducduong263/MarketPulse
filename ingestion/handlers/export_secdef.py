@@ -136,6 +136,10 @@ def _fetch_with_retry(client, symbol: str):
         if status == 200:
             return status, body
         print(f"[WARN] {symbol}: HTTP {status} (attempt {attempt}/{MAX_RETRY}) - {body}")
+        
+        if status == 404:
+            break
+            
         if attempt < MAX_RETRY:
             time.sleep(RETRY_DELAY * attempt)
     return status, body

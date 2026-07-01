@@ -313,7 +313,7 @@ def _fetch_existing_trade_fps_delta(symbol: str, from_ts: datetime, to_ts: datet
         dt = DeltaTable(TRADE_DELTA_TABLE_URI, storage_options=storage_options)
         tbl = dt.to_pyarrow_table(
             columns=["symbol", "exchange_ts", "price", "quantity", "side"],
-            partitions=[("symbol", "=", symbol)]
+            filters=[[("symbol", "=", symbol)]]
         )
         df = tbl.to_pandas()
         if df.empty:
@@ -540,7 +540,6 @@ def backfill_trade(
         status, body = _api_request_with_retry(
             client.get_trades,
             symbol=symbol,
-            board_id="G1",
             from_date=from_epoch,
             to_date=to_epoch,
             limit=API_LIMIT,
@@ -564,6 +563,8 @@ def backfill_trade(
         if write_db and trades and conn is not None:
             rows_to_insert = []
             for t in trades:
+                if t.get("boardId", "G1") != "G1":
+                    continue
                 row = _trade_record_to_row(t, symbol)
                 if row is None:
                     continue
@@ -684,7 +685,7 @@ def _fetch_existing_quote_fps_delta(symbol: str, from_ts: datetime, to_ts: datet
         dt = DeltaTable(QUOTE_DELTA_TABLE_URI, storage_options=storage_options)
         tbl = dt.to_pyarrow_table(
             columns=["symbol", "exchange_ts", "bid_price1", "ask_price1"],
-            partitions=[("symbol", "=", symbol)]
+            filters=[[("symbol", "=", symbol)]]
         )
         df = tbl.to_pandas()
         if df.empty:
@@ -932,7 +933,6 @@ def backfill_quote(
         status, body = _api_request_with_retry(
             client.get_quotes,
             symbol=symbol,
-            board_id="G1",
             from_date=from_epoch,
             to_date=to_epoch,
             limit=API_LIMIT,
@@ -956,6 +956,8 @@ def backfill_quote(
         if write_db and quotes and conn is not None:
             rows_to_insert = []
             for q in quotes:
+                if q.get("boardId", "G1") != "G1":
+                    continue
                 row = _quote_record_to_row(q, symbol)
                 if row is None:
                     continue
@@ -1363,7 +1365,7 @@ def run_backfill(
                 dt = DeltaTable(TRADE_DELTA_TABLE_URI, storage_options=storage_options)
                 tbl = dt.to_pyarrow_table(
                     columns=["exchange_ts"],
-                    partitions=[("symbol", "=", tsym)]
+                    filters=[[("symbol", "=", tsym)]]
                 )
                 if len(tbl) > 0:
                     df_ts = tbl.column("exchange_ts").to_pandas()
@@ -1402,7 +1404,7 @@ def run_backfill(
                 dt = DeltaTable(QUOTE_DELTA_TABLE_URI, storage_options=storage_options)
                 tbl = dt.to_pyarrow_table(
                     columns=["exchange_ts"],
-                    partitions=[("symbol", "=", tsym)]
+                    filters=[[("symbol", "=", tsym)]]
                 )
                 if len(tbl) > 0:
                     df_ts = tbl.column("exchange_ts").to_pandas()

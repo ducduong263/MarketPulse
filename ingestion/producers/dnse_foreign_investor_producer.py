@@ -22,7 +22,7 @@ load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────
 KAFKA_TOPIC = "market.foreign-investor"
-BOARD_ID    = "*"  # Subscribe all boards
+BOARD_ID    = "G1"
 
 _resolver = SymbolResolver()
 print(f"[CONFIG] Filter: {_resolver.describe()}")
